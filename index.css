@@ -1,0 +1,98 @@
+
+/* Reset de escala e box-sizing para consistência Pixel-Perfect */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #020617;
+  overflow: hidden;
+}
+
+html {
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ============================================================
+   SISTEMA DE SCROLLER CUSTOMIZADO (NÃO-NATIVO)
+   ============================================================ */
+
+/* Suporte para Chrome, Edge, Safari e outros Webkit */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;               /* Reduzido de 6px para 4px (mais elegante) */
+  height: 4px;              /* Reduzido de 6px para 4px */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(3, 7, 18, 0.4); /* Fundo profundo e translúcido */
+  border-left: 1px solid rgba(30, 41, 59, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.15); /* Azul sutil por padrão */
+  border-radius: 100px;
+  border: 1px solid rgba(59, 130, 246, 0.05);
+  transition: all 0.3s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5); /* Brilho ativo no hover */
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #3b82f6;
+}
+
+/* Suporte para Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.3) rgba(3, 7, 18, 0.4);
+}
+
+/* Esconder scrollbar nativo em áreas específicas se necessário */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ============================================================
+   UTILITÁRIOS E ANIMAÇÕES
+   ============================================================ */
+
+@keyframes drag-glow {
+  0%, 100% { border-color: rgba(59, 130, 246, 0.3); }
+  50% { border-color: rgba(59, 130, 246, 0.8); box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
+}
+
+.drop-target-active {
+  animation: drag-glow 1s infinite;
+  background: rgba(59, 130, 246, 0.05) !important;
+}
+
+.flex-1 { flex: 1 1 0%; }
+.h-full { height: 100%; }
+.w-full { width: 100%; }
+
+.note-editor ul { list-style-type: disc !important; padding-left: 1.5rem !important; }
+.note-editor ol { list-style-type: decimal !important; padding-left: 1.5rem !important; }
