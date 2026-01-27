@@ -183,16 +183,8 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </div>
         </div>
         
-        {/* Sub-Navegação Expandida */}
+        {/* Sub-Navegação Expandida - Ordem atualizada: CALENDÁRIO antes de HOJE */}
         <div className="flex items-center bg-black/40 p-1 rounded-sm border border-slate-800">
-          <button 
-            onClick={() => setActiveSubTab('HOJE')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeSubTab === 'HOJE' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <LayoutGrid size={14} /> Hoje
-          </button>
           <button 
             onClick={() => setActiveSubTab('CALENDARIO')}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
@@ -200,6 +192,14 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
             }`}
           >
             <CalendarIcon size={14} /> Calendário
+          </button>
+          <button 
+            onClick={() => setActiveSubTab('HOJE')}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
+              activeSubTab === 'HOJE' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <LayoutGrid size={14} /> Hoje
           </button>
           <button 
             onClick={() => setActiveSubTab('CADASTRO')}
