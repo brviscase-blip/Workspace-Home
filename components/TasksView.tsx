@@ -1,12 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckCircle, Circle, Terminal, ListCheck, Loader2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Circle, Terminal, ListCheck, Loader2, Target, CalendarDays, CheckCircle2 } from 'lucide-react';
 import { DailyTask } from '../types';
 import { supabase } from '../lib/supabase';
 
-interface TasksViewProps {
-  currentUser: string;
-}
+interface TasksViewProps { interval: string; currentUser: string; }
 
 const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [tasks, setTasks] = useState<DailyTask[]>([]);
@@ -15,10 +13,19 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
   const fetchTasks = async () => {
     try {
+      // Define o intervalo para o dia de hoje (00:00:00 até 23:59:59)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
       const { data, error } = await supabase
         .from('daily_tasks')
         .select('*')
         .eq('user_name', currentUser)
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -33,11 +40,9 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   useEffect(() => {
     fetchTasks();
 
-    // Ouve mudanças em tempo real para manter sincronizado com outros terminais
     const channel = supabase
       .channel('tasks-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_tasks' }, (payload) => {
-        // Se a mudança veio de outro lugar, atualizamos a lista
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_tasks' }, () => {
         fetchTasks();
       })
       .subscribe();
@@ -63,12 +68,11 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
       fetchTasks();
     } catch (err) {
       console.error('Erro ao adicionar tarefa:', err);
-      setNewTaskTitle(tempTitle); // Devolve o texto em caso de erro
+      setNewTaskTitle(tempTitle);
     }
   };
 
   const toggleTask = async (id: string, completed: boolean) => {
-    // ATUALIZAÇÃO OTIMISTA: Muda o estado local IMEDIATAMENTE
     setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !completed } : t));
 
     try {
@@ -78,7 +82,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         .eq('id', id);
 
       if (error) {
-        // Reverte em caso de erro no servidor
         setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: completed } : t));
         throw error;
       }
@@ -88,7 +91,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   };
 
   const deleteTask = async (id: string) => {
-    // ATUALIZAÇÃO OTIMISTA: Remove da lista local IMEDIATAMENTE
     const taskBackup = tasks.find(t => t.id === id);
     setTasks(prev => prev.filter(t => t.id !== id));
 
@@ -99,7 +101,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         .eq('id', id);
 
       if (error) {
-        // Reverte em caso de erro
         if (taskBackup) setTasks(prev => [taskBackup, ...prev]);
         throw error;
       }
@@ -108,7 +109,15 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
   };
 
-  const pendingCount = tasks.filter(t => !t.completed).length;
+  const totalToday = tasks.length;
+  const completedToday = tasks.filter(t => t.completed).length;
+  const pendingCount = totalToday - completedToday;
+  const progressPercent = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
+  const goalReached = totalToday > 0 && progressPercent === 100;
+
+  const todayFormatted = new Intl.DateTimeFormat('pt-BR', { 
+    dateStyle: 'full' 
+  }).format(new Date());
 
   return (
     <div className="flex flex-col h-full bg-[#020617] border border-slate-800 rounded-sm overflow-hidden animate-in fade-in duration-500">
@@ -116,20 +125,63 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
       <div className="p-6 border-b border-slate-800 bg-black/20 flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h2 className="text-sm font-black uppercase tracking-[0.4em] text-white flex items-center gap-3">
-            <ListCheck className="text-blue-500" size={18} /> Central de Tarefas
+            <ListCheck className="text-blue-500" size={18} /> Checklist Diário
           </h2>
-          <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
-            Fluxo operacional diário • {pendingCount} pendentes
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <CalendarDays size={12} className="text-slate-500" />
+            <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
+              {todayFormatted}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="px-3 py-1 rounded-sm bg-slate-900 border border-slate-800 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-            Protocolo Ativo
+            Ciclo Atual: Ativo
           </div>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden max-w-4xl mx-auto w-full p-8">
+        
+        {/* Indicador de Meta Diária */}
+        <div className={`mb-8 p-6 border transition-all duration-700 rounded-sm flex flex-col gap-4 ${
+          goalReached 
+          ? 'bg-emerald-500/5 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.05)]' 
+          : 'bg-slate-900/20 border-slate-800 shadow-sm'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-sm flex items-center justify-center transition-all duration-500 ${
+                goalReached ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-500'
+              }`}>
+                {goalReached ? <CheckCircle2 size={18} strokeWidth={2.5} /> : <Target size={18} />}
+              </div>
+              <div className="flex flex-col">
+                <span className={`text-[11px] font-black uppercase tracking-[0.2em] transition-colors ${goalReached ? 'text-emerald-400' : 'text-slate-400'}`}>
+                  {goalReached ? 'Missão Cumprida' : 'Objetivo Operacional'}
+                </span>
+                <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">
+                  {completedToday} de {totalToday} tarefas finalizadas
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`text-xl font-black tabular-nums transition-colors ${goalReached ? 'text-emerald-400' : 'text-slate-400'}`}>
+                {progressPercent}%
+              </span>
+            </div>
+          </div>
+          
+          <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800/50">
+            <div 
+              className={`h-full transition-all duration-1000 ease-out rounded-full ${
+                goalReached ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 'bg-blue-600'
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
         {/* Input de Adição */}
         <form onSubmit={addTask} className="mb-10 relative group">
           <div className="absolute -inset-0.5 bg-blue-600 rounded-sm blur-sm opacity-0 group-focus-within:opacity-10 transition duration-500"></div>
@@ -161,7 +213,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           ) : tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20">
               <Terminal size={40} className="text-slate-700 mb-4" />
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Nenhuma tarefa pendente no diretório</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Inicie o seu checklist diário acima</p>
             </div>
           ) : (
             tasks.map(task => (
