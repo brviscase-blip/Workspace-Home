@@ -33,9 +33,13 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   useEffect(() => {
     fetchTasks();
 
+    // Ouve mudanças em tempo real para manter sincronizado com outros terminais
     const channel = supabase
       .channel('tasks-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_tasks' }, fetchTasks)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_tasks' }, (payload) => {
+        // Se a mudança veio de outro lugar, atualizamos a lista
+        fetchTasks();
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -45,44 +49,60 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
+    const tempTitle = newTaskTitle.trim();
+    setNewTaskTitle('');
+
     try {
       const { error } = await supabase.from('daily_tasks').insert([{
-        title: newTaskTitle.trim(),
+        title: tempTitle,
         user_name: currentUser,
         completed: false
       }]);
 
       if (error) throw error;
-      setNewTaskTitle('');
       fetchTasks();
     } catch (err) {
       console.error('Erro ao adicionar tarefa:', err);
+      setNewTaskTitle(tempTitle); // Devolve o texto em caso de erro
     }
   };
 
   const toggleTask = async (id: string, completed: boolean) => {
+    // ATUALIZAÇÃO OTIMISTA: Muda o estado local IMEDIATAMENTE
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !completed } : t));
+
     try {
       const { error } = await supabase
         .from('daily_tasks')
         .update({ completed: !completed })
         .eq('id', id);
 
-      if (error) throw error;
-      fetchTasks();
+      if (error) {
+        // Reverte em caso de erro no servidor
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: completed } : t));
+        throw error;
+      }
     } catch (err) {
       console.error('Erro ao atualizar tarefa:', err);
     }
   };
 
   const deleteTask = async (id: string) => {
+    // ATUALIZAÇÃO OTIMISTA: Remove da lista local IMEDIATAMENTE
+    const taskBackup = tasks.find(t => t.id === id);
+    setTasks(prev => prev.filter(t => t.id !== id));
+
     try {
       const { error } = await supabase
         .from('daily_tasks')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
-      fetchTasks();
+      if (error) {
+        // Reverte em caso de erro
+        if (taskBackup) setTasks(prev => [taskBackup, ...prev]);
+        throw error;
+      }
     } catch (err) {
       console.error('Erro ao excluir tarefa:', err);
     }
@@ -103,8 +123,8 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1 rounded-sm bg-blue-600/10 border border-blue-500/30 text-[9px] font-black text-blue-400 uppercase tracking-widest">
-            Sincronizado
+          <div className="px-3 py-1 rounded-sm bg-slate-900 border border-slate-800 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+            Protocolo Ativo
           </div>
         </div>
       </div>
@@ -112,19 +132,19 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
       <div className="flex-1 flex flex-col overflow-hidden max-w-4xl mx-auto w-full p-8">
         {/* Input de Adição */}
         <form onSubmit={addTask} className="mb-10 relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-sm blur opacity-10 group-focus-within:opacity-30 transition duration-500"></div>
+          <div className="absolute -inset-0.5 bg-blue-600 rounded-sm blur-sm opacity-0 group-focus-within:opacity-10 transition duration-500"></div>
           <div className="relative flex gap-2">
             <input 
               autoFocus
-              className="flex-1 bg-slate-900 border border-slate-800 rounded-sm px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500 transition-all placeholder:text-slate-700 shadow-xl"
-              placeholder="O que precisa ser executado hoje? (Pressione Enter)"
+              className="flex-1 bg-slate-950 border border-slate-800 rounded-sm px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-700 shadow-sm"
+              placeholder="O que precisa ser executado hoje?"
               value={newTaskTitle}
               onChange={e => setNewTaskTitle(e.target.value)}
             />
             <button 
               type="submit"
               disabled={!newTaskTitle.trim()}
-              className="bg-blue-600 px-6 rounded-sm text-white hover:bg-blue-500 transition-all disabled:opacity-50 flex items-center justify-center shadow-lg shadow-blue-500/20"
+              className="bg-blue-600 px-6 rounded-sm text-white hover:bg-blue-500 transition-all disabled:opacity-30 flex items-center justify-center shadow-md active:scale-95"
             >
               <Plus size={20} strokeWidth={3} />
             </button>
@@ -135,46 +155,48 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2 pb-10">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="animate-spin text-blue-500" size={32} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Acessando Banco de Dados...</span>
+              <Loader2 className="animate-spin text-slate-700" size={32} />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Sincronizando...</span>
             </div>
           ) : tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-800/40 rounded-sm opacity-30">
+            <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20">
               <Terminal size={40} className="text-slate-700 mb-4" />
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600">Nenhum registro no radar operacional</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Nenhuma tarefa pendente no diretório</p>
             </div>
           ) : (
             tasks.map(task => (
               <div 
                 key={task.id}
-                className={`group flex items-center justify-between p-4 bg-slate-900/30 border rounded-sm transition-all duration-300 hover:shadow-xl hover:shadow-black/40 ${
-                  task.completed ? 'border-emerald-500/10 opacity-50' : 'border-slate-800 hover:border-slate-700'
+                className={`group flex items-center justify-between p-4 bg-slate-900/20 border rounded-sm transition-all duration-300 ${
+                  task.completed 
+                    ? 'border-emerald-500/10 opacity-40' 
+                    : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900/40 shadow-sm'
                 }`}
               >
                 <div className="flex items-center gap-5 flex-1 mr-4">
                   <button 
                     onClick={() => toggleTask(task.id, task.completed)}
-                    className={`flex-shrink-0 transition-all duration-300 transform active:scale-75 ${
+                    className={`flex-shrink-0 transition-all duration-300 transform active:scale-90 ${
                       task.completed ? 'text-emerald-500' : 'text-slate-700 hover:text-blue-500'
                     }`}
                   >
                     {task.completed ? (
-                      <CheckCircle size={22} strokeWidth={2.5} />
+                      <CheckCircle size={20} strokeWidth={2.5} />
                     ) : (
-                      <Circle size={22} strokeWidth={2.5} />
+                      <Circle size={20} strokeWidth={2.5} />
                     )}
                   </button>
                   <span className={`text-[13px] font-bold tracking-tight transition-all duration-500 ${
-                    task.completed ? 'text-slate-500 line-through' : 'text-slate-200'
+                    task.completed ? 'text-slate-600 line-through' : 'text-slate-300'
                   }`}>
                     {task.title}
                   </span>
                 </div>
                 <button 
                   onClick={() => deleteTask(task.id)}
-                  className="text-slate-800 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-rose-500/5 rounded-sm"
+                  className="text-slate-700 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-2 rounded-sm"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={15} />
                 </button>
               </div>
             ))
