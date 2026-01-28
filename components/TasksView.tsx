@@ -5,7 +5,7 @@ import {
   CalendarDays, CheckCircle2, LayoutGrid, ClipboardEdit, Edit2, Check, X, 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap, Activity, Flame,
   Settings2, AlertTriangle, Book, Dumbbell, Droplets, Brain, Timer, Heart, 
-  Smile, Coffee, Laptop, ShieldCheck, Stars, Calendar
+  Smile, Coffee, Laptop, ShieldCheck, Stars, Calendar, Info
 } from 'lucide-react';
 import { DailyTask } from '../types';
 import { supabase } from '../lib/supabase';
@@ -17,14 +17,14 @@ type SubTab = 'CALENDARIO' | 'HOJE' | 'HABITOS' | 'CADASTRO';
 interface Habit {
   id: string;
   title: string;
-  days: boolean[]; // 7 dias da semana
+  days: boolean[]; // 7 dias da semana (status de conclusão na semana atual)
+  recurrence: boolean[]; // 7 dias da semana (quais dias o hábito deve ocorrer)
   streak: number;
   iconName: string;
   color: string;
   startDate: string;
 }
 
-// Mapa de ícones disponíveis para seleção
 const HABIT_ICONS = [
   { name: 'Activity', icon: Activity },
   { name: 'Book', icon: Book },
@@ -40,7 +40,6 @@ const HABIT_ICONS = [
   { name: 'Stars', icon: Stars },
 ];
 
-// Cores operacionais consistentes
 const HABIT_COLORS = [
   { name: 'Blue', value: '#3b82f6' },
   { name: 'Emerald', value: '#10b981' },
@@ -58,9 +57,10 @@ interface CustomDatePickerProps {
   value: string;
   onChange: (val: string) => void;
   placeholder: string;
+  enabledDaysOfWeek?: number[]; // Array de índices (0=Dom, 1=Seg...)
 }
 
-const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onChange, placeholder }) => {
+const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onChange, placeholder, enabledDaysOfWeek }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -102,10 +102,21 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
     <div className="space-y-1 relative" ref={containerRef}>
       <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">{label}</label>
       <div 
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full bg-slate-950 border rounded-sm px-4 py-3 text-sm flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'border-blue-500 ring-1 ring-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-slate-800 hover:border-slate-700'}`}
+        onClick={() => {
+          if (enabledDaysOfWeek && enabledDaysOfWeek.length === 0) return;
+          setIsOpen(!isOpen);
+        }}
+        className={`w-full bg-slate-950 border rounded-sm px-4 py-3 text-sm flex items-center justify-between transition-all ${
+          enabledDaysOfWeek && enabledDaysOfWeek.length === 0 
+            ? 'opacity-30 cursor-not-allowed border-slate-800' 
+            : isOpen 
+              ? 'border-blue-500 ring-1 ring-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)] cursor-pointer' 
+              : 'border-slate-800 hover:border-slate-700 cursor-pointer'
+        }`}
       >
-        <span className={value ? 'text-white font-bold' : 'text-slate-700'}>{value || placeholder}</span>
+        <span className={value ? 'text-white font-bold' : 'text-slate-700'}>
+          {enabledDaysOfWeek && enabledDaysOfWeek.length === 0 ? 'Defina a recorrência primeiro' : value || placeholder}
+        </span>
         <CalendarIcon size={16} className={value ? 'text-blue-500' : 'text-slate-600'} />
       </div>
       {isOpen && (
@@ -124,6 +135,10 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
               {days.map((day, i) => {
                 if (day === null) return <div key={`empty-${i}`} className="w-full h-full" />;
 
+                const dateObj = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+                const dayOfWeek = dateObj.getDay();
+                const isEnabled = !enabledDaysOfWeek || enabledDaysOfWeek.includes(dayOfWeek);
+
                 const isToday = 
                   day === new Date().getDate() && 
                   viewDate.getMonth() === new Date().getMonth() && 
@@ -138,17 +153,20 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
                   <div key={i} className="aspect-square flex items-center justify-center">
                     <button 
                       type="button" 
+                      disabled={!isEnabled}
                       onClick={() => handleSelectDay(day)} 
                       className={`w-full h-full rounded-sm text-[10px] font-bold transition-all flex flex-col items-center justify-center relative overflow-hidden ${
-                        isSelected 
-                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 z-10' 
-                          : isToday
-                            ? 'bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/50'
-                            : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+                        !isEnabled
+                          ? 'opacity-10 cursor-not-allowed'
+                          : isSelected 
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 z-10' 
+                            : isToday
+                              ? 'bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/50'
+                              : 'text-slate-500 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
                       {day}
-                      {isToday && !isSelected && (
+                      {isToday && !isSelected && isEnabled && (
                         <div className="absolute bottom-1 w-1 h-1 bg-blue-500 rounded-full" />
                       )}
                     </button>
@@ -157,11 +175,10 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
               })}
             </div>
           </div>
-          {/* Footer Informativo */}
           <div className="p-2 border-t border-slate-800/50 bg-black/20 flex justify-center">
              <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full ring-1 ring-blue-500/50 bg-blue-500/10" />
-                <span className="text-[7px] font-black text-slate-600 uppercase tracking-widest">Indicador do Dia Atual</span>
+                <span className="text-[7px] font-black text-slate-600 uppercase tracking-widest">Apenas dias de execução disponíveis</span>
              </div>
           </div>
         </div>
@@ -181,6 +198,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitStartDate, setNewHabitStartDate] = useState('');
+  const [newHabitRecurrence, setNewHabitRecurrence] = useState<boolean[]>([true, true, true, true, true, true, true]);
   const [selectedIcon, setSelectedIcon] = useState('Activity');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   
@@ -196,10 +214,10 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
   // Mock de hábitos
   const [habits, setHabits] = useState<Habit[]>([
-    { id: 'h1', title: 'Leitura Técnica', days: [true, true, true, false, false, false, false], streak: 3, iconName: 'Book', color: '#3b82f6', startDate: '01 Jan, 2026' },
-    { id: 'h2', title: 'Atividade Física', days: [true, false, true, false, true, false, false], streak: 1, iconName: 'Dumbbell', color: '#10b981', startDate: '15 Jan, 2026' },
-    { id: 'h3', title: 'Meditação Protocolar', days: [true, true, true, true, true, true, false], streak: 6, iconName: 'Brain', color: '#8b5cf6', startDate: '05 Jan, 2026' },
-    { id: 'h4', title: 'Beber Água', days: [false, false, false, false, false, false, false], streak: 0, iconName: 'Droplets', color: '#06b6d4', startDate: '20 Jan, 2026' },
+    { id: 'h1', title: 'Leitura Técnica', days: [true, true, true, false, false, false, false], recurrence: [false, true, true, true, true, true, false], streak: 3, iconName: 'Book', color: '#3b82f6', startDate: '01 Jan, 2026' },
+    { id: 'h2', title: 'Atividade Física', days: [true, false, true, false, true, false, false], recurrence: [false, true, false, true, false, true, false], streak: 1, iconName: 'Dumbbell', color: '#10b981', startDate: '15 Jan, 2026' },
+    { id: 'h3', title: 'Meditação Protocolar', days: [true, true, true, true, true, true, false], recurrence: [true, true, true, true, true, true, true], streak: 6, iconName: 'Brain', color: '#8b5cf6', startDate: '05 Jan, 2026' },
+    { id: 'h4', title: 'Beber Água', days: [false, false, false, false, false, false, false], recurrence: [true, true, true, true, true, true, true], streak: 0, iconName: 'Droplets', color: '#06b6d4', startDate: '20 Jan, 2026' },
   ]);
 
   const fetchTodayTasks = async () => {
@@ -292,7 +310,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     if (editingHabit) {
       setHabits(prev => prev.map(h => 
         h.id === editingHabit.id 
-        ? { ...h, title: newHabitTitle.trim(), iconName: selectedIcon, color: selectedColor, startDate: newHabitStartDate } 
+        ? { ...h, title: newHabitTitle.trim(), iconName: selectedIcon, color: selectedColor, startDate: newHabitStartDate, recurrence: newHabitRecurrence } 
         : h
       ));
     } else {
@@ -300,6 +318,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         id: `h-${Date.now()}`,
         title: newHabitTitle.trim(),
         days: [false, false, false, false, false, false, false],
+        recurrence: newHabitRecurrence,
         streak: 0,
         iconName: selectedIcon,
         color: selectedColor,
@@ -310,8 +329,28 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
     setNewHabitTitle('');
     setNewHabitStartDate('');
+    setNewHabitRecurrence([true, true, true, true, true, true, true]);
     setEditingHabit(null);
     setIsHabitModalOpen(false);
+  };
+
+  const toggleRecurrenceDay = (idx: number) => {
+    const updated = [...newHabitRecurrence];
+    updated[idx] = !updated[idx];
+    setNewHabitRecurrence(updated);
+    
+    // Se a data de início atual não for mais válida com a nova recorrência, limpa a data
+    if (newHabitStartDate) {
+      const months: Record<string, number> = { 'Jan': 0, 'Fev': 1, 'Mar': 2, 'Abr': 3, 'Mai': 4, 'Jun': 5, 'Jul': 6, 'Ago': 7, 'Set': 8, 'Out': 9, 'Nov': 10, 'Dez': 11 };
+      const parts = newHabitStartDate.replace(',', '').split(' ');
+      const day = parseInt(parts[0]);
+      const month = months[parts[1]];
+      const year = parseInt(parts[2]);
+      const date = new Date(year, month, day);
+      if (!updated[date.getDay()]) {
+        setNewHabitStartDate('');
+      }
+    }
   };
 
   const handleUpdateTask = async (id: string, newTitle: string) => {
@@ -395,6 +434,13 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const goalReached = totalToday > 0 && progressPercent === 100;
   const todayFormatted = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' }).format(new Date());
   const weekDaysShort = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+
+  // Dias habilitados para o date picker baseado na recorrência
+  const enabledDaysIndices = useMemo(() => {
+    return newHabitRecurrence
+      .map((active, idx) => active ? idx : -1)
+      .filter(idx => idx !== -1);
+  }, [newHabitRecurrence]);
 
   return (
     <div className="flex flex-col h-full bg-[#020617] border border-slate-800 rounded-sm overflow-hidden animate-in fade-in duration-500">
@@ -531,6 +577,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                   setEditingHabit(null);
                   setNewHabitTitle('');
                   setNewHabitStartDate('');
+                  setNewHabitRecurrence([true, true, true, true, true, true, true]);
                   setSelectedIcon('Activity');
                   setSelectedColor('#3b82f6');
                   setIsHabitModalOpen(true);
@@ -579,31 +626,36 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                       </div>
 
                       <div className="flex-1 grid grid-cols-7 gap-2 max-w-md">
-                        {habit.days.map((done, idx) => (
-                          <div key={idx} className="flex flex-col items-center gap-2">
-                            <span className="text-[8px] font-black text-slate-600 tracking-tighter">{weekDaysShort[idx]}</span>
-                            <button 
-                              onClick={() => toggleHabitDay(habit.id, idx)}
-                              className={`w-full aspect-square rounded-sm border transition-all flex items-center justify-center ${
-                                done 
-                                  ? 'shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white' 
-                                  : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                              }`}
-                              style={{ 
-                                backgroundColor: done ? habit.color : '',
-                                borderColor: done ? habit.color : ''
-                              }}
-                            >
-                              {done && <Check size={14} strokeWidth={4} />}
-                            </button>
-                          </div>
-                        ))}
+                        {habit.days.map((done, idx) => {
+                          const isRecurrentDay = habit.recurrence[idx];
+                          return (
+                            <div key={idx} className={`flex flex-col items-center gap-2 transition-opacity ${!isRecurrentDay ? 'opacity-20' : ''}`}>
+                              <span className="text-[8px] font-black text-slate-600 tracking-tighter">{weekDaysShort[idx]}</span>
+                              <button 
+                                disabled={!isRecurrentDay}
+                                onClick={() => toggleHabitDay(habit.id, idx)}
+                                className={`w-full aspect-square rounded-sm border transition-all flex items-center justify-center ${
+                                  done 
+                                    ? 'shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white' 
+                                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                                }`}
+                                style={{ 
+                                  backgroundColor: done ? habit.color : '',
+                                  borderColor: done ? habit.color : ''
+                                }}
+                              >
+                                {done && <Check size={14} strokeWidth={4} />}
+                                {!done && !isRecurrentDay && <div className="w-1 h-1 bg-slate-800 rounded-full" />}
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       <div className="flex items-center gap-6 min-w-[150px] justify-end">
                         <div className="text-right mr-2">
                           <span className="text-2xl font-black text-white tabular-nums">
-                            {Math.round((habit.days.filter(d => d).length / 7) * 100)}%
+                            {Math.round((habit.days.filter((d, i) => d && habit.recurrence[i]).length / habit.recurrence.filter(r => r).length) * 100)}%
                           </span>
                           <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Aderência</p>
                         </div>
@@ -614,6 +666,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                               setEditingHabit(habit);
                               setNewHabitTitle(habit.title);
                               setNewHabitStartDate(habit.startDate);
+                              setNewHabitRecurrence(habit.recurrence);
                               setSelectedIcon(habit.iconName);
                               setSelectedColor(habit.color);
                               setIsHabitModalOpen(true);
@@ -803,8 +856,8 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
       {/* MODAL DE CADASTRO/EDIÇÃO DE HÁBITO */}
       {isHabitModalOpen && (
         <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300 px-4">
-          <div className="bg-[#030712] border border-slate-800 rounded-sm w-full max-w-lg shadow-2xl animate-in zoom-in duration-300 overflow-visible">
-            <div className="p-6 border-b border-slate-800 bg-black/20 flex items-center justify-between">
+          <div className="bg-[#030712] border border-slate-800 rounded-sm w-full max-w-lg shadow-2xl animate-in zoom-in duration-300 overflow-visible max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-slate-800 bg-black/20 flex items-center justify-between flex-shrink-0">
               <div className="flex flex-col gap-1">
                 <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
                    <Zap size={14} className="text-blue-500" /> Protocolo de Rotina
@@ -824,7 +877,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveHabit} className="p-6 space-y-8">
+            <form onSubmit={handleSaveHabit} className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
               {/* Título */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Identificação da Rotina</label>
@@ -841,12 +894,37 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 </div>
               </div>
 
+              {/* Recorrência Semana */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Recorrência Semana</label>
+                <div className="grid grid-cols-7 gap-1.5">
+                   {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
+                     <button
+                       key={idx}
+                       type="button"
+                       onClick={() => toggleRecurrenceDay(idx)}
+                       className={`aspect-square rounded-sm border text-[10px] font-black transition-all flex items-center justify-center ${
+                         newHabitRecurrence[idx] 
+                           ? 'bg-blue-600 border-blue-500 text-white shadow-lg' 
+                           : 'bg-slate-950 border-slate-800 text-slate-600 hover:border-slate-700'
+                       }`}
+                     >
+                       {day}
+                     </button>
+                   ))}
+                </div>
+                <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest mt-2 flex items-center gap-1.5">
+                  <Info size={10} className="text-blue-500" /> A data de início será restrita aos dias selecionados acima
+                </p>
+              </div>
+
               {/* Data de Início Customizada */}
               <CustomDatePicker 
                 label="Data do Início (Marco Zero)"
                 placeholder="Selecione a data de ativação..."
                 value={newHabitStartDate}
                 onChange={setNewHabitStartDate}
+                enabledDaysOfWeek={enabledDaysIndices}
               />
 
               {/* Seletor de Ícones */}
@@ -910,7 +988,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                     </p>
                     <div className="flex items-center gap-1.5 mt-1">
                        <Calendar size={10} className="text-slate-600" />
-                       <span className="text-[9px] font-black text-slate-500 uppercase">{newHabitStartDate || 'Data não definida'}</span>
+                       <span className="text-[9px] font-black text-slate-500 uppercase">{newHabitStartDate || 'Selecione uma data válida'}</span>
                     </div>
                  </div>
               </div>
@@ -928,7 +1006,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 </button>
                 <button 
                   type="submit"
-                  disabled={!newHabitTitle.trim() || !newHabitStartDate}
+                  disabled={!newHabitTitle.trim() || !newHabitStartDate || newHabitRecurrence.filter(r => r).length === 0}
                   className="flex-1 px-4 py-3 bg-blue-600 rounded-sm text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-30"
                 >
                   {editingHabit ? 'Salvar Alterações' : 'Ativar Hábito'}
