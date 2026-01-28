@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Folder, Settings, ClipboardList, ChevronLeft, ChevronRight, StickyNote, ListCheck, LogOut, Shield } from 'lucide-react';
+import { Folder, Settings, ClipboardList, ChevronLeft, ChevronRight, StickyNote, ListCheck, LogOut, Shield, Maximize2, Minimize2 } from 'lucide-react';
 import { ViewType } from '../types';
 
 interface SidebarProps {
@@ -19,6 +19,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,6 +31,25 @@ const Sidebar: React.FC<SidebarProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+    setIsSettingsOpen(false);
+  };
 
   return (
     <aside 
@@ -144,6 +164,14 @@ const Sidebar: React.FC<SidebarProps> = ({
               className="w-full text-left px-4 py-3 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-3 uppercase tracking-widest transition-all"
             >
               <Settings size={14} /> Preferências
+            </button>
+
+            <button 
+              onClick={toggleFullscreen}
+              className="w-full text-left px-4 py-3 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-3 uppercase tracking-widest transition-all border-t border-slate-800/50"
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia'}
             </button>
 
             <button 

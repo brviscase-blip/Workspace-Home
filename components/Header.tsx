@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Trash2, CheckCircle2, AlertTriangle, Info, Zap, X, Clock, Maximize2, Minimize2 } from 'lucide-react';
+import { Bell, Trash2, CheckCircle2, AlertTriangle, Info, Zap, X, Clock } from 'lucide-react';
 import { Notification, NotificationType } from './NotificationSystem';
 import { supabase } from '../lib/supabase';
 
@@ -24,7 +24,6 @@ const Header: React.FC<HeaderProps> = ({
   onlineUsers = []
 }) => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,24 +35,6 @@ const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-      });
-    } else {
-      document.exitFullscreen();
-    }
-  };
 
   const getInitials = (name: string | null) => {
     if (!name) return '??';
@@ -83,14 +64,6 @@ const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-4">
           
-          <button 
-            onClick={toggleFullscreen}
-            className="text-slate-400 hover:text-white transition-all active:scale-95 p-2 rounded-sm"
-            title={isFullscreen ? "Sair da Tela Cheia" : "Modo Tela Cheia"}
-          >
-            {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-          </button>
-
           <div className="relative" ref={panelRef}>
             <button 
               onClick={() => setIsPanelOpen(!isPanelOpen)}
