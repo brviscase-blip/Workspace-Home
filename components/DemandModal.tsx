@@ -179,7 +179,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
         <CalendarIcon size={14} className="text-slate-500" />
       </div>
       {isOpen && (
-        <div className="absolute z-[4000] left-0 mt-1 w-64 bg-[#030712] border border-slate-800 rounded-sm shadow-2xl animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="absolute z-[4000] left-0 mt-1 w-72 bg-[#030712] border border-slate-800 rounded-sm shadow-2xl animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-center justify-between p-3 border-b border-slate-800 bg-black/40">
             <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} className="text-slate-500 hover:text-white transition-colors"><ChevronLeft size={16} /></button>
             <div className="flex flex-col items-center">
@@ -188,7 +188,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
             </div>
             <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))} className="text-slate-500 hover:text-white transition-colors"><ChevronRight size={16} /></button>
           </div>
-          <div className="p-2">
+          <div className="p-3">
             <div className="grid grid-cols-7 mb-1">{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (<span key={i} className="text-center text-[8px] font-black text-slate-600 uppercase py-1">{d}</span>))}</div>
             <div className="grid grid-cols-7 gap-1">
               {days.map((day, i) => (
