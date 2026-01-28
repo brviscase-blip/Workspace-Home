@@ -443,10 +443,10 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen bg-[#020617] text-slate-200 overflow-hidden">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} isCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} />
+      <Sidebar activeView={activeView} onViewChange={setActiveView} isCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} onLogout={handleLogout} />
       
       <main className="flex-1 flex flex-col min-w-0 bg-[#020617] transition-all duration-300">
-        <Header onSearchChange={setSearchQuery} title={activeView === 'NOTAS' ? 'Documentação' : activeView === 'TAREFAS' ? 'Tarefas' : 'Demandas'} history={history} onClearHistory={onClearHistory} onRemoveHistoryItem={onRemoveHistoryItem} onLogout={handleLogout} currentUser={currentUser} onlineUsers={onlineUsers} />
+        <Header onSearchChange={setSearchQuery} title={activeView === 'NOTAS' ? 'Documentação' : activeView === 'TAREFAS' ? 'Tarefas' : 'Demandas'} history={history} onClearHistory={onClearHistory} onRemoveHistoryItem={onRemoveHistoryItem} currentUser={currentUser} onlineUsers={onlineUsers} />
         
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex flex-col overflow-hidden">

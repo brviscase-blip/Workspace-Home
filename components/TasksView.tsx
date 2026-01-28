@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, Trash2, CheckCircle, Circle, Terminal, ListCheck, Loader2, Target, 
   CalendarDays, CheckCircle2, LayoutGrid, ClipboardEdit, Edit2, Check, X, 
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap, Activity, Flame
+  ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap, Activity, Flame,
+  Settings2
 } from 'lucide-react';
 import { DailyTask } from '../types';
 import { supabase } from '../lib/supabase';
@@ -24,9 +25,13 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [calendarTasks, setCalendarTasks] = useState<DailyTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newHabitTitle, setNewHabitTitle] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  
+  // Estados para o Modal de Hábito
+  const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
   
   // Estado para o Calendário
   const [viewDate, setViewDate] = useState(new Date());
@@ -121,6 +126,22 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
   };
 
+  const handleCreateHabit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHabitTitle.trim()) return;
+
+    const newHabit: Habit = {
+      id: `h-${Date.now()}`,
+      title: newHabitTitle.trim(),
+      days: [false, false, false, false, false, false, false],
+      streak: 0
+    };
+
+    setHabits(prev => [...prev, newHabit]);
+    setNewHabitTitle('');
+    setIsHabitModalOpen(false);
+  };
+
   const handleUpdateTask = async (id: string, newTitle: string) => {
     if (!newTitle.trim()) return;
     setTasks(prev => prev.map(t => t.id === id ? { ...t, title: newTitle } : t));
@@ -170,6 +191,10 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
       }
       return h;
     }));
+  };
+
+  const deleteHabit = (id: string) => {
+    setHabits(prev => prev.filter(h => h.id !== id));
   };
 
   // Lógica de Renderização do Calendário
@@ -327,57 +352,77 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               </div>
             </div>
 
+            {/* Botão de Registro Simplificado */}
+            <div className="mb-8 flex justify-start">
+              <button 
+                onClick={() => setIsHabitModalOpen(true)}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-sm border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-400 hover:border-blue-500 hover:bg-blue-500/10 transition-all text-[10px] font-black uppercase tracking-[0.2em] group shadow-xl"
+              >
+                <Plus size={14} className="group-hover:scale-125 transition-transform" />
+                Registrar Novo Hábito
+              </button>
+            </div>
+
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 pb-10">
-              {habits.map(habit => (
-                <div key={habit.id} className="bg-slate-900/30 border border-slate-800 rounded-sm p-6 hover:border-slate-700 transition-all group">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-4 min-w-[200px]">
-                      <div className="w-10 h-10 rounded-sm bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                        <Activity size={20} />
-                      </div>
-                      <div>
-                        <h4 className="text-[13px] font-black text-white uppercase tracking-tight">{habit.title}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Flame size={10} className="text-orange-500" />
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias Seguidores</span>
+              {habits.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20">
+                  <Activity size={40} className="text-slate-700 mb-4" />
+                  <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Nenhum hábito configurado</p>
+                </div>
+              ) : (
+                habits.map(habit => (
+                  <div key={habit.id} className="bg-slate-900/30 border border-slate-800 rounded-sm p-6 hover:border-slate-700 transition-all group shadow-sm">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="flex items-center gap-4 min-w-[200px]">
+                        <div className="w-10 h-10 rounded-sm bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                          <Activity size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-[13px] font-black text-white uppercase tracking-tight">{habit.title}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Flame size={10} className="text-orange-500" />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias Seguidores</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex-1 grid grid-cols-7 gap-2 max-w-md">
-                      {habit.days.map((done, idx) => (
-                        <div key={idx} className="flex flex-col items-center gap-2">
-                          <span className="text-[8px] font-black text-slate-600 tracking-tighter">{weekDaysShort[idx]}</span>
-                          <button 
-                            onClick={() => toggleHabitDay(habit.id, idx)}
-                            className={`w-full aspect-square rounded-sm border transition-all flex items-center justify-center ${
-                              done 
-                                ? 'bg-blue-600 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white' 
-                                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                            }`}
-                          >
-                            {done && <Check size={14} strokeWidth={4} />}
-                          </button>
+                      <div className="flex-1 grid grid-cols-7 gap-2 max-w-md">
+                        {habit.days.map((done, idx) => (
+                          <div key={idx} className="flex flex-col items-center gap-2">
+                            <span className="text-[8px] font-black text-slate-600 tracking-tighter">{weekDaysShort[idx]}</span>
+                            <button 
+                              onClick={() => toggleHabitDay(habit.id, idx)}
+                              className={`w-full aspect-square rounded-sm border transition-all flex items-center justify-center ${
+                                done 
+                                  ? 'bg-blue-600 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white' 
+                                  : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                              }`}
+                            >
+                              {done && <Check size={14} strokeWidth={4} />}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-6 min-w-[120px] justify-end">
+                        <div className="text-right">
+                          <span className="text-2xl font-black text-white tabular-nums">
+                            {Math.round((habit.days.filter(d => d).length / 7) * 100)}%
+                          </span>
+                          <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Aderência</p>
                         </div>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-col items-end">
-                      <div className="text-right">
-                        <span className="text-2xl font-black text-white tabular-nums">
-                          {Math.round((habit.days.filter(d => d).length / 7) * 100)}%
-                        </span>
-                        <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Aderência</p>
+                        <button 
+                          onClick={() => deleteHabit(habit.id)}
+                          className="p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-sm opacity-0 group-hover:opacity-100 transition-all"
+                          title="Remover Hábito"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              
-              <button className="w-full py-6 border border-dashed border-slate-800 rounded-sm text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all flex flex-col items-center justify-center gap-2 group">
-                <Plus size={24} className="group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Adicionar Nova Rotina</span>
-              </button>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -543,6 +588,71 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </div>
         )}
       </div>
+
+      {/* MODAL DE CADASTRO DE HÁBITO */}
+      {isHabitModalOpen && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-[#030712] border border-slate-800 rounded-sm w-full max-w-md shadow-2xl animate-in zoom-in duration-300 overflow-hidden">
+            {/* Header do Modal */}
+            <div className="p-6 border-b border-slate-800 bg-black/20 flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
+                   <Zap size={14} className="text-blue-500" /> Protocolo de Rotina
+                </h3>
+                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Configurar novo hábito operacional</p>
+              </div>
+              <button 
+                onClick={() => setIsHabitModalOpen(false)}
+                className="text-slate-500 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Corpo do Modal */}
+            <form onSubmit={handleCreateHabit} className="p-6 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Identificação da Rotina</label>
+                <div className="relative group">
+                   <Settings2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-blue-500 transition-colors" size={16} />
+                   <input 
+                      autoFocus
+                      required
+                      placeholder="Ex: Leitura de Logs de Segurança..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-sm py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all placeholder:text-slate-800"
+                      value={newHabitTitle}
+                      onChange={e => setNewHabitTitle(e.target.value)}
+                   />
+                </div>
+              </div>
+
+              <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-sm">
+                 <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
+                    <span className="text-blue-400 font-bold">INFO:</span> Novos hábitos são inicializados com status neutro. A aderência será monitorada a partir do primeiro registro de execução.
+                 </p>
+              </div>
+
+              {/* Footer do Modal */}
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsHabitModalOpen(false)}
+                  className="flex-1 px-4 py-3 border border-slate-800 rounded-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-800 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={!newHabitTitle.trim()}
+                  className="flex-1 px-4 py-3 bg-blue-600 rounded-sm text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-30"
+                >
+                  Ativar Hábito
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

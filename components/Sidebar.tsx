@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Folder, Settings, ClipboardList, ChevronLeft, ChevronRight, StickyNote, ListCheck } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Folder, Settings, ClipboardList, ChevronLeft, ChevronRight, StickyNote, ListCheck, LogOut, Shield } from 'lucide-react';
 import { ViewType } from '../types';
 
 interface SidebarProps {
@@ -8,14 +8,29 @@ interface SidebarProps {
   onViewChange: (view: ViewType) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onLogout: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
   activeView, 
   onViewChange, 
   isCollapsed, 
-  onToggleCollapse 
+  onToggleCollapse,
+  onLogout
 }) => {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <aside 
       className={`bg-[#030712] border-r border-slate-800 flex flex-col transition-all duration-300 ease-in-out relative z-[100] ${
@@ -98,19 +113,47 @@ const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </nav>
 
-      {/* Footer */}
-      <div className={`p-6 ${isCollapsed ? 'flex justify-center' : ''}`}>
+      {/* Footer / Settings */}
+      <div className={`p-6 relative ${isCollapsed ? 'flex justify-center' : ''}`} ref={settingsRef}>
         <button 
-          className={`flex items-center gap-3 text-slate-400 hover:text-white transition-colors w-full group ${isCollapsed ? 'justify-center' : ''}`}
+          onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+          className={`flex items-center gap-3 transition-all duration-300 w-full group p-2 rounded-sm border ${
+            isSettingsOpen ? 'bg-slate-800 border-blue-500/50 text-white' : 'text-slate-400 hover:text-white border-transparent'
+          } ${isCollapsed ? 'justify-center' : ''}`}
           title={isCollapsed ? "Configurações" : ""}
         >
-          <Settings size={18} className="group-hover:rotate-45 transition-transform duration-500 flex-shrink-0" />
+          <Settings size={18} className={`${isSettingsOpen ? 'rotate-45' : 'group-hover:rotate-45'} transition-transform duration-500 flex-shrink-0`} />
           {!isCollapsed && (
             <span className="text-xs font-bold tracking-wider animate-in fade-in slide-in-from-left-1 duration-300">
               Configurações
             </span>
           )}
         </button>
+
+        {isSettingsOpen && (
+          <div className={`absolute bottom-full mb-2 bg-[#030712] border border-slate-800 rounded-sm shadow-2xl z-[200] overflow-hidden animate-in slide-in-from-bottom-2 duration-300 ${
+            isCollapsed ? 'left-4 w-48' : 'left-6 right-6'
+          }`}>
+            <div className="p-3 border-b border-slate-800/50 bg-black/20">
+               <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                 <Shield size={10} /> Painel de Controle
+               </p>
+            </div>
+            
+            <button 
+              className="w-full text-left px-4 py-3 text-[10px] font-black text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-3 uppercase tracking-widest transition-all"
+            >
+              <Settings size={14} /> Preferências
+            </button>
+
+            <button 
+              onClick={onLogout}
+              className="w-full text-left px-4 py-3 text-[10px] font-black text-rose-500 hover:text-white hover:bg-rose-600 flex items-center gap-3 uppercase tracking-widest transition-all border-t border-slate-800/50"
+            >
+              <LogOut size={14} /> Terminar Sessão
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );

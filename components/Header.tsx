@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Trash2, CheckCircle2, AlertTriangle, Info, Zap, X, Clock, LogOut, Maximize2, Minimize2 } from 'lucide-react';
+import { Bell, Trash2, CheckCircle2, AlertTriangle, Info, Zap, X, Clock, Maximize2, Minimize2 } from 'lucide-react';
 import { Notification, NotificationType } from './NotificationSystem';
 import { supabase } from '../lib/supabase';
 
@@ -10,7 +10,6 @@ interface HeaderProps {
   history: Notification[];
   onClearHistory: () => void;
   onRemoveHistoryItem: (id: string) => void;
-  onLogout: () => void;
   currentUser: string | null;
   onlineUsers?: string[];
 }
@@ -21,7 +20,6 @@ const Header: React.FC<HeaderProps> = ({
   history, 
   onClearHistory, 
   onRemoveHistoryItem,
-  onLogout,
   currentUser,
   onlineUsers = []
 }) => {
@@ -155,7 +153,7 @@ const Header: React.FC<HeaderProps> = ({
 
           <div className="flex items-center gap-4">
             {/* Pilha de Operadores Online */}
-            <div className="flex items-center -space-x-2 mr-2">
+            <div className="flex items-center -space-x-2">
               {onlineUsers.map((user) => (
                 <div 
                   key={user} 
@@ -172,20 +170,6 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
               ))}
             </div>
-
-            {/* Sessão / Logout */}
-            <button 
-              onClick={onLogout}
-              className="flex items-center gap-3 px-4 py-2 bg-slate-900/50 border border-slate-800 rounded-sm hover:border-rose-500/50 hover:bg-rose-500/5 transition-all group active:scale-95 shadow-lg shadow-black/20"
-            >
-              <div className="flex flex-col items-end mr-1 hidden sm:flex">
-                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 group-hover:text-rose-500/70 transition-colors">Terminar Sessão</span>
-                <span className="text-[10px] font-bold text-white uppercase">{currentUser}</span>
-              </div>
-              <div className="w-8 h-8 rounded-sm bg-black/40 border border-slate-800 flex items-center justify-center text-slate-500 group-hover:text-rose-500 group-hover:border-rose-500/30 transition-all">
-                <LogOut size={16} />
-              </div>
-            </button>
           </div>
         </div>
       </div>
