@@ -121,14 +121,48 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
           <div className="p-2">
             <div className="grid grid-cols-7 mb-1">{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (<span key={i} className="text-center text-[8px] font-black text-slate-700 uppercase py-1">{d}</span>))}</div>
             <div className="grid grid-cols-7 gap-1">
-              {days.map((day, i) => (
-                <div key={i} className="aspect-square flex items-center justify-center">
-                  {day !== null ? (
-                    <button type="button" onClick={() => handleSelectDay(day)} className={`w-full h-full rounded-sm text-[10px] font-bold transition-all flex items-center justify-center ${value.startsWith(day.toString().padStart(2, '0')) && value.includes(months[viewDate.getMonth()]) ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-500 hover:bg-slate-800 hover:text-white'}`}>{day}</button>
-                  ) : <div className="w-full h-full" />}
-                </div>
-              ))}
+              {days.map((day, i) => {
+                if (day === null) return <div key={`empty-${i}`} className="w-full h-full" />;
+
+                const isToday = 
+                  day === new Date().getDate() && 
+                  viewDate.getMonth() === new Date().getMonth() && 
+                  viewDate.getFullYear() === new Date().getFullYear();
+
+                const isSelected = 
+                  value.startsWith(day.toString().padStart(2, '0')) && 
+                  value.includes(months[viewDate.getMonth()]) &&
+                  value.includes(viewDate.getFullYear().toString());
+
+                return (
+                  <div key={i} className="aspect-square flex items-center justify-center">
+                    <button 
+                      type="button" 
+                      onClick={() => handleSelectDay(day)} 
+                      className={`w-full h-full rounded-sm text-[10px] font-bold transition-all flex flex-col items-center justify-center relative overflow-hidden ${
+                        isSelected 
+                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 z-10' 
+                          : isToday
+                            ? 'bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/50'
+                            : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {day}
+                      {isToday && !isSelected && (
+                        <div className="absolute bottom-1 w-1 h-1 bg-blue-500 rounded-full" />
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
+          </div>
+          {/* Footer Informativo */}
+          <div className="p-2 border-t border-slate-800/50 bg-black/20 flex justify-center">
+             <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full ring-1 ring-blue-500/50 bg-blue-500/10" />
+                <span className="text-[7px] font-black text-slate-600 uppercase tracking-widest">Indicador do Dia Atual</span>
+             </div>
           </div>
         </div>
       )}
