@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Sidebar from './components/Sidebar';
-import Header from './components/Header';
 import DemandTable from './components/DemandTable';
 import KanbanView from './components/KanbanView';
 import NotesView from './components/NotesView';
@@ -74,14 +73,6 @@ const App: React.FC = () => {
 
   const handleRemoveNotification = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  const onClearHistory = useCallback(() => {
-    setHistory([]);
-  }, []);
-
-  const onRemoveHistoryItem = useCallback((id: string) => {
-    setHistory(prev => prev.filter(item => item.id !== id));
   }, []);
 
   useEffect(() => {
@@ -348,12 +339,12 @@ const App: React.FC = () => {
       case 'TAREFAS':
         return <TasksView currentUser={currentUser || ''} />;
       case 'NOTAS':
-        return <div className="flex-1 h-full overflow-hidden"><NotesView notes={notes} setNotes={setNotes} folders={folders} setFolders={setFolders} /></div>;
+        return <div className="flex-1 h-full overflow-hidden pt-8"><NotesView notes={notes} setNotes={setNotes} folders={folders} setFolders={setFolders} /></div>;
       case 'DEMANDAS':
       default:
         return (
           <>
-            <div className="flex items-center justify-between mb-8 pt-2 flex-shrink-0">
+            <div className="flex items-center justify-between mb-8 pt-8 flex-shrink-0">
               <div className="flex items-center gap-4">
                 <div className="relative" ref={statusMenuRef}>
                   <button onClick={() => setIsStatusMenuOpen(!isStatusMenuOpen)} className={`flex items-center gap-3 px-6 py-2.5 rounded-sm bg-[#030712] border text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl ${activeTab !== 'SEMANA' ? 'border-blue-500/50 text-white' : 'border-slate-800 text-slate-400 hover:border-slate-700'}`}>
@@ -446,8 +437,6 @@ const App: React.FC = () => {
       <Sidebar activeView={activeView} onViewChange={setActiveView} isCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} onLogout={handleLogout} />
       
       <main className="flex-1 flex flex-col min-w-0 bg-[#020617] transition-all duration-300">
-        <Header onSearchChange={setSearchQuery} title={activeView === 'NOTAS' ? 'Documentação' : activeView === 'TAREFAS' ? 'Tarefas' : 'Demandas'} history={history} onClearHistory={onClearHistory} onRemoveHistoryItem={onRemoveHistoryItem} currentUser={currentUser} onlineUsers={onlineUsers} />
-        
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="px-8 flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -464,7 +453,17 @@ const App: React.FC = () => {
                   <div className="flex items-center gap-2"><Terminal size={12} className="text-blue-500" /><span className="text-[9px] font-black uppercase tracking-widest text-slate-600">LOG:</span><span className="text-[9px] font-bold text-slate-400 animate-pulse">Handshake seguro com Artifacts-Core-V3... [OK]</span></div>
                   <div className="flex items-center gap-4"><div className="flex items-center gap-1.5"><Cpu size={12} className="text-slate-700" /><span className="text-[9px] font-bold text-slate-600 uppercase">SYS_LOAD: NORMAL</span></div><div className="flex items-center gap-1.5"><Shield size={12} className="text-slate-700" /><span className="text-[9px] font-bold text-slate-600 uppercase">PROTOCOLO: POTA_V1</span></div></div>
                </div>
-               <div className="flex items-center gap-4"><span className="text-[9px] font-black text-slate-700 uppercase">Uptime: 100%</span><div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /><span className="text-[9px] font-black text-emerald-500 uppercase">Serviços Estáveis</span></div></div>
+               <div className="flex items-center gap-4">
+                  <div className="flex items-center -space-x-2 mr-2">
+                    {onlineUsers.map((user) => (
+                      <div key={user} className="w-5 h-5 rounded-full border border-[#030712] bg-slate-800 flex items-center justify-center text-[7px] font-black uppercase text-slate-400" title={user}>
+                        {user.substring(0, 2)}
+                      </div>
+                    ))}
+                  </div>
+                  <span className="text-[9px] font-black text-slate-700 uppercase">Uptime: 100%</span>
+                  <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /><span className="text-[9px] font-black text-emerald-500 uppercase">Serviços Estáveis</span></div>
+               </div>
             </footer>
           </div>
         </div>
