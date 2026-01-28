@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase';
 
 interface TasksViewProps { currentUser: string; }
 
-type SubTab = 'CALENDARIO' | 'HOJE' | 'HABITOS' | 'CADASTRO';
+type SubTab = 'CALENDARIO' | 'HOJE' | 'HABITOS' | 'COTIDIANO';
 
 interface Habit {
   id: string;
@@ -428,10 +428,23 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   }, [viewDate]);
 
   const monthName = viewDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-  const totalToday = tasks.length;
-  const completedToday = tasks.filter(t => t.completed).length;
-  const progressPercent = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
-  const goalReached = totalToday > 0 && progressPercent === 100;
+  
+  // --- LÓGICA DE FILTRAGEM PARA A ABA HOJE ---
+  const todayDayIndex = new Date().getDay();
+  const habitsForToday = useMemo(() => {
+    return habits.filter(h => h.recurrence[todayDayIndex]);
+  }, [habits, todayDayIndex]);
+
+  const completedTodayTasks = tasks.filter(t => t.completed).length;
+  const completedTodayHabits = habitsForToday.filter(h => h.days[todayDayIndex]).length;
+  
+  const totalTodayItems = tasks.length + habitsForToday.length;
+  const completedTodayItems = completedTodayTasks + completedTodayHabits;
+  
+  const progressPercent = totalTodayItems > 0 ? Math.round((completedTodayItems / totalTodayItems) * 100) : 0;
+  const goalReached = totalTodayItems > 0 && progressPercent === 100;
+  // ---------------------------------------------
+
   const todayFormatted = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' }).format(new Date());
   const weekDaysShort = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
@@ -484,12 +497,12 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
             <Zap size={14} /> Hábitos
           </button>
           <button 
-            onClick={() => setActiveSubTab('CADASTRO')}
+            onClick={() => setActiveSubTab('COTIDIANO')}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeSubTab === 'CADASTRO' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
+              activeSubTab === 'COTIDIANO' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <ClipboardEdit size={14} /> Cadastro
+            <ClipboardEdit size={14} /> Cotidiano
           </button>
         </div>
       </div>
@@ -501,37 +514,85 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
             <div className="lg:col-span-7 flex flex-col h-full overflow-hidden">
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500">Fluxo de Trabalho</span>
-                <span className="text-[10px] font-bold text-slate-600 uppercase tabular-nums">{tasks.length} ITENS</span>
+                <span className="text-[10px] font-bold text-slate-600 uppercase tabular-nums">{totalTodayItems} ITENS PROGRAMADOS</span>
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2 pb-10">
+              
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6 pr-2 pb-10">
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-4">
                     <Loader2 className="animate-spin text-slate-700" size={32} />
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Sincronizando...</span>
                   </div>
-                ) : tasks.length === 0 ? (
+                ) : totalTodayItems === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20">
                     <Terminal size={40} className="text-slate-700 mb-4" />
                     <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Lista vazia para hoje</p>
                   </div>
                 ) : (
-                  tasks.map(task => (
-                    <div 
-                      key={task.id}
-                      className={`group flex items-center justify-between p-4 bg-slate-900/20 border rounded-sm transition-all duration-300 ${
-                        task.completed ? 'border-emerald-500/10 opacity-40' : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900/40 shadow-sm'
-                      }`}
-                    >
-                      <div className="flex items-center gap-5 flex-1 mr-4">
-                        <button onClick={() => toggleTask(task.id, task.completed)} className={`flex-shrink-0 transition-all duration-300 transform active:scale-90 ${task.completed ? 'text-emerald-500' : 'text-slate-700 hover:text-blue-500'}`}>
-                          {task.completed ? <CheckCircle size={22} strokeWidth={2.5} /> : <Circle size={22} strokeWidth={2.5} />}
-                        </button>
-                        <span className={`text-[13px] font-bold tracking-tight transition-all duration-500 ${task.completed ? 'text-slate-600 line-through' : 'text-slate-300'}`}>
-                          {task.title}
-                        </span>
+                  <>
+                    {/* Seção de Hábitos do Dia */}
+                    {habitsForToday.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 border-l-2 border-blue-500 pl-3">Protocolos de Hábito</h4>
+                        {habitsForToday.map(habit => {
+                          const isDone = habit.days[todayDayIndex];
+                          return (
+                            <div 
+                              key={habit.id}
+                              className={`group flex items-center justify-between p-4 bg-slate-900/20 border rounded-sm transition-all duration-300 ${
+                                isDone ? 'border-emerald-500/10 opacity-40' : 'border-slate-800 hover:border-blue-500/30 hover:bg-slate-900/40 shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-center gap-5 flex-1 mr-4">
+                                <button 
+                                  onClick={() => toggleHabitDay(habit.id, todayDayIndex)} 
+                                  className={`flex-shrink-0 transition-all duration-300 transform active:scale-90 ${isDone ? 'text-emerald-500' : 'text-slate-700 hover:text-blue-500'}`}
+                                >
+                                  {isDone ? <CheckCircle2 size={22} strokeWidth={2.5} /> : <Circle size={22} strokeWidth={2.5} />}
+                                </button>
+                                <div className="flex items-center gap-3">
+                                   <HabitIcon name={habit.iconName} color={isDone ? '#475569' : habit.color} size={16} />
+                                   <span className={`text-[13px] font-black uppercase tracking-tight transition-all duration-500 ${isDone ? 'text-slate-600 line-through' : 'text-slate-200'}`}>
+                                      {habit.title}
+                                   </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                 <Flame size={12} className={isDone ? "text-slate-700" : "text-orange-500"} />
+                                 <span className="text-[10px] font-bold text-slate-500 tabular-nums">{habit.streak}d</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
+                    )}
+
+                    {/* Seção de Tarefas do Dia */}
+                    <div className="space-y-3">
+                      <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 border-l-2 border-slate-700 pl-3">Tarefas Operacionais</h4>
+                      {tasks.length === 0 ? (
+                        <p className="text-[10px] font-bold text-slate-700 uppercase pl-3">Nenhuma tarefa pontual registrada</p>
+                      ) : (
+                        tasks.map(task => (
+                          <div 
+                            key={task.id}
+                            className={`group flex items-center justify-between p-4 bg-slate-900/20 border rounded-sm transition-all duration-300 ${
+                              task.completed ? 'border-emerald-500/10 opacity-40' : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900/40 shadow-sm'
+                            }`}
+                          >
+                            <div className="flex items-center gap-5 flex-1 mr-4">
+                              <button onClick={() => toggleTask(task.id, task.completed)} className={`flex-shrink-0 transition-all duration-300 transform active:scale-90 ${task.completed ? 'text-emerald-500' : 'text-slate-700 hover:text-blue-500'}`}>
+                                {task.completed ? <CheckCircle size={22} strokeWidth={2.5} /> : <Circle size={22} strokeWidth={2.5} />}
+                              </button>
+                              <span className={`text-[13px] font-bold tracking-tight transition-all duration-500 ${task.completed ? 'text-slate-600 line-through' : 'text-slate-300'}`}>
+                                {task.title}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
-                  ))
+                  </>
                 )}
               </div>
             </div>
@@ -545,7 +606,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={`text-[12px] font-black uppercase tracking-[0.2em] transition-colors ${goalReached ? 'text-emerald-400' : 'text-slate-400'}`}>{goalReached ? 'Objetivo Cumprido' : 'Meta do Ciclo Diário'}</span>
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{completedToday} de {totalToday} execuções concluídas</span>
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{completedTodayItems} de {totalTodayItems} execuções concluídas</span>
                   </div>
                 </div>
                 <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800/50">
@@ -783,8 +844,26 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </div>
         )}
 
-        {activeSubTab === 'CADASTRO' && (
+        {activeSubTab === 'COTIDIANO' && (
           <div className="flex flex-col h-full animate-in slide-in-from-left-4 duration-500 max-w-4xl mx-auto w-full">
+            <div className="mb-6 flex justify-start">
+              <button 
+                onClick={() => {
+                  setEditingHabit(null);
+                  setNewHabitTitle('');
+                  setNewHabitStartDate('');
+                  setNewHabitRecurrence([true, true, true, true, true, true, true]);
+                  setSelectedIcon('Activity');
+                  setSelectedColor('#3b82f6');
+                  setIsHabitModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-sm border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-400 hover:border-blue-500 hover:bg-blue-500/10 transition-all text-[10px] font-black uppercase tracking-[0.2em] group shadow-xl"
+              >
+                <Plus size={14} className="group-hover:scale-125 transition-transform" />
+                Registrar Novo Hábito
+              </button>
+            </div>
+
             <form onSubmit={addTask} className="mb-10 relative group w-full">
               <div className="absolute -inset-0.5 bg-blue-600 rounded-sm blur-sm opacity-0 group-focus-within:opacity-10 transition duration-500"></div>
               <div className="relative flex gap-2">
