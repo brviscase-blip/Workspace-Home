@@ -17,9 +17,9 @@ type SubTab = 'CALENDARIO' | 'HOJE' | 'HABITOS' | 'COTIDIANO';
 interface Habit {
   id: string;
   title: string;
-  dailyProgress: number[]; // Progresso atual em cada dia (0-6)
-  targetValue: number; // Meta a ser atingida (ex: 8)
-  recurrence: boolean[]; // Quais dias o hábito ocorre
+  dailyProgress: number[]; 
+  targetValue: number; 
+  recurrence: boolean[]; 
   streak: number;
   iconName: string;
   color: string;
@@ -52,7 +52,6 @@ const HABIT_COLORS = [
   { name: 'Slate', value: '#64748b' },
 ];
 
-// --- COMPONENTE DATE PICKER CUSTOMIZADO ---
 interface CustomDatePickerProps {
   label: string;
   value: string;
@@ -167,9 +166,6 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
                       }`}
                     >
                       {day}
-                      {isToday && !isSelected && isEnabled && (
-                        <div className="absolute bottom-1 w-1 h-1 bg-blue-500 rounded-full" />
-                      )}
                     </button>
                   </div>
                 );
@@ -188,7 +184,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [calendarTasks, setCalendarTasks] = useState<DailyTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   
-  // Estados para o Modal de Hábito
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [newHabitTitle, setNewHabitTitle] = useState('');
@@ -201,14 +196,9 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
-  
-  // Estado para Confirmação de Exclusão
   const [habitToDelete, setHabitToDelete] = useState<Habit | null>(null);
-  
-  // Estado para o Calendário
   const [viewDate, setViewDate] = useState(new Date());
 
-  // Mock de hábitos atualizado com metas
   const [habits, setHabits] = useState<Habit[]>([
     { id: 'h1', title: 'Leitura Técnica', dailyProgress: [5, 10, 15, 0, 0, 0, 0], targetValue: 30, recurrence: [false, true, true, true, true, true, false], streak: 3, iconName: 'Book', color: '#3b82f6', startDate: '01 Jan, 2026' },
     { id: 'h2', title: 'Atividade Física', dailyProgress: [1, 0, 1, 0, 1, 0, 0], targetValue: 1, recurrence: [false, true, false, true, false, true, false], streak: 1, iconName: 'Dumbbell', color: '#10b981', startDate: '15 Jan, 2026' },
@@ -389,7 +379,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
   };
 
-  // --- LÓGICA DE INCREMENTO DE HÁBITO ---
   const incrementHabit = (habitId: string, dayIndex: number) => {
     setHabits(prev => prev.map(h => {
       if (h.id === habitId) {
@@ -397,8 +386,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         if (newProgress[dayIndex] < h.targetValue) {
           newProgress[dayIndex] += 1;
         } else {
-          // Se já bateu a meta, um clique pode resetar para 0 (opcional) ou não fazer nada
-          // Aqui vamos permitir "desfazer" a conclusão se já estiver no máximo
           newProgress[dayIndex] = 0;
         }
         return { ...h, dailyProgress: newProgress };
@@ -408,7 +395,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   };
 
   const decrementHabit = (e: React.MouseEvent, habitId: string, dayIndex: number) => {
-    e.preventDefault(); // Previne menu de contexto
+    e.preventDefault();
     setHabits(prev => prev.map(h => {
       if (h.id === habitId) {
         const newProgress = [...h.dailyProgress];
@@ -446,7 +433,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
   const monthName = viewDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
   
-  // --- LÓGICA DE PERFORMANCE DIÁRIA (PONDERADA) ---
   const todayDayIndex = new Date().getDay();
   const habitsForToday = useMemo(() => {
     return habits.filter(h => h.recurrence[todayDayIndex]);
@@ -454,7 +440,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
   const completedTodayTasks = tasks.filter(t => t.completed).length;
   
-  // A conclusão de hábitos agora é baseada na soma das porcentagens atingidas
   const habitsPercentageSum = habitsForToday.reduce((acc, h) => {
     return acc + (h.dailyProgress[todayDayIndex] / h.targetValue);
   }, 0);
@@ -464,7 +449,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   
   const progressPercent = totalTodayItems > 0 ? Math.round((weightedCompletedItems / totalTodayItems) * 100) : 0;
   const goalReached = totalTodayItems > 0 && progressPercent >= 100;
-  // --------------------------------------------------
 
   const todayFormatted = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' }).format(new Date());
   const weekDaysShort = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
@@ -516,7 +500,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                   <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20"><Terminal size={40} className="text-slate-700 mb-4" /><p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Lista vazia para hoje</p></div>
                 ) : (
                   <>
-                    {/* Seção de Hábitos do Dia */}
                     {habitsForToday.length > 0 && (
                       <div className="space-y-3">
                         <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 border-l-2 border-blue-500 pl-3">Protocolos de Hábito</h4>
@@ -533,7 +516,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                                 isDone ? 'border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.05)]' : 'border-slate-800 hover:border-blue-500/30'
                               }`}
                             >
-                              {/* Barra de Progresso Interna */}
                               <div className="absolute left-0 bottom-0 h-[2px] bg-blue-500/20 transition-all duration-500" style={{ width: `${perc}%`, backgroundColor: isDone ? '#10b981' : habit.color }} />
 
                               <div className="flex items-center gap-5 flex-1 mr-4 relative z-10">
@@ -564,7 +546,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                       </div>
                     )}
 
-                    {/* Seção de Tarefas do Dia */}
                     <div className="space-y-3">
                       <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 border-l-2 border-slate-700 pl-3">Tarefas Operacionais</h4>
                       {tasks.length === 0 ? (
@@ -649,34 +630,46 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               ) : (
                 habits.map(habit => (
                   <div key={habit.id} className="bg-slate-900/30 border border-slate-800 rounded-sm p-6 hover:border-slate-700 transition-all group shadow-sm">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center gap-4 min-w-[200px]">
-                        <div className="w-10 h-10 rounded-sm border flex items-center justify-center transition-all" style={{ backgroundColor: `${habit.color}10`, borderColor: `${habit.color}30` }}>
-                          <HabitIcon name={habit.iconName} color={habit.color} />
+                    {/* REESTRUTURAÇÃO DO GRID: Identidade -> Grade -> Performance */}
+                    <div className="grid grid-cols-[300px_1fr_120px_auto] items-center gap-8">
+                      
+                      {/* 1. IDENTIDADE (FIXO ESQUERDA) */}
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-11 h-11 rounded-sm border flex items-center justify-center transition-all flex-shrink-0" style={{ backgroundColor: `${habit.color}10`, borderColor: `${habit.color}30` }}>
+                          <HabitIcon name={habit.iconName} color={habit.color} size={24} />
                         </div>
-                        <div className="flex-1">
-                          <h4 className="text-[13px] font-black text-white uppercase tracking-tight">{habit.title}</h4>
-                          <div className="flex items-center gap-4 mt-1">
-                            <div className="flex items-center gap-2"><Flame size={10} className="text-orange-500" /><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias</span></div>
-                            <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3"><Calendar size={10} className="text-slate-600" /><span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{habit.startDate}</span></div>
+                        <div className="min-w-0">
+                          <h4 className="text-[13px] font-black text-white uppercase tracking-tight truncate">{habit.title}</h4>
+                          <div className="flex items-center gap-3 mt-1">
+                            <div className="flex items-center gap-1.5">
+                              <Flame size={10} className="text-orange-500" />
+                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3">
+                              <Calendar size={10} className="text-slate-600" />
+                              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{habit.startDate}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex-1 grid grid-cols-7 gap-2 max-w-md">
+                      {/* 2. GRADE SEMANAL (OCUPA O ESPAÇO CENTRAL RESTANTE) */}
+                      <div className="flex items-center justify-start gap-3">
                         {habit.dailyProgress.map((val, idx) => {
                           const isRecurrentDay = habit.recurrence[idx];
                           const isDone = val >= habit.targetValue;
+                          const currentPerc = (val / habit.targetValue) * 100;
+                          
                           return (
-                            <div key={idx} className={`flex flex-col items-center gap-2 transition-opacity ${!isRecurrentDay ? 'opacity-20' : ''}`}>
-                              <span className="text-[8px] font-black text-slate-600 tracking-tighter">{weekDaysShort[idx]}</span>
+                            <div key={idx} className={`flex flex-col items-center gap-1.5 transition-opacity ${!isRecurrentDay ? 'opacity-20' : ''}`}>
+                              <span className="text-[8px] font-black text-slate-600 tracking-tighter uppercase">{weekDaysShort[idx]}</span>
                               <button 
                                 disabled={!isRecurrentDay}
                                 onClick={() => incrementHabit(habit.id, idx)}
                                 onContextMenu={(e) => decrementHabit(e, habit.id, idx)}
-                                className={`w-full aspect-square rounded-sm border transition-all flex flex-col items-center justify-center relative overflow-hidden ${
+                                className={`w-10 h-10 rounded-sm border transition-all flex flex-col items-center justify-center relative overflow-hidden group/btn ${
                                   isDone 
-                                    ? 'shadow-[0_0_15px_rgba(59,130,246,0.2)] text-white' 
+                                    ? 'shadow-[0_0_15px_rgba(59,130,246,0.15)] text-white' 
                                     : 'bg-slate-950 border-slate-800 hover:border-slate-700'
                                 }`}
                                 style={{ 
@@ -684,12 +677,19 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                                   borderColor: isDone ? habit.color : ''
                                 }}
                               >
-                                {isDone ? <Check size={14} strokeWidth={4} /> : (
-                                  <span className="text-[9px] font-black text-slate-500 group-hover:text-white transition-colors">{val}/{habit.targetValue}</span>
+                                {isDone ? (
+                                  <Check size={14} strokeWidth={4} className="animate-in zoom-in duration-300" />
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center">
+                                    <span className="text-[9px] font-black text-slate-500 group-hover/btn:text-white transition-colors">{val}</span>
+                                    <div className="w-4 h-[1px] bg-slate-800 my-0.5" />
+                                    <span className="text-[8px] font-bold text-slate-700">{habit.targetValue}</span>
+                                  </div>
                                 )}
-                                {/* Mini Barra de Progresso Interna */}
+                                
+                                {/* Barra de progresso interna discreta */}
                                 {!isDone && val > 0 && (
-                                  <div className="absolute bottom-0 left-0 h-[2px] bg-blue-500/50" style={{ width: `${(val / habit.targetValue) * 100}%` }} />
+                                  <div className="absolute bottom-0 left-0 h-[2px] bg-blue-500/30 transition-all" style={{ width: `${currentPerc}%` }} />
                                 )}
                               </button>
                             </div>
@@ -697,18 +697,34 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                         })}
                       </div>
 
-                      <div className="flex items-center gap-6 min-w-[150px] justify-end">
-                        <div className="text-right mr-2">
-                           <span className="text-2xl font-black text-white tabular-nums">
+                      {/* 3. ADERÊNCIA (FIXO DIREITA) */}
+                      <div className="text-right border-l border-slate-800 pl-6 pr-2">
+                        <div className="flex flex-col">
+                           <span className="text-2xl font-black text-white tabular-nums leading-none">
                               {Math.round((habit.dailyProgress.filter((v, i) => v >= habit.targetValue && habit.recurrence[i]).length / habit.recurrence.filter(r => r).length) * 100)}%
                            </span>
-                           <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Aderência</p>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                          <button onClick={() => { setEditingHabit(habit); setNewHabitTitle(habit.title); setNewHabitTarget(habit.targetValue); setNewHabitStartDate(habit.startDate); setNewHabitRecurrence(habit.recurrence); setSelectedIcon(habit.iconName); setSelectedColor(habit.color); setIsHabitModalOpen(true); }} className="p-2 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-sm" title="Editar Hábito"><Edit2 size={16} /></button>
-                          <button onClick={() => setHabitToDelete(habit)} className="p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-sm" title="Remover Hábito"><Trash2 size={16} /></button>
+                           <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mt-1">Aderência</p>
                         </div>
                       </div>
+
+                      {/* 4. AÇÕES (FLUTUANTE NO HOVER) */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all pl-2">
+                        <button 
+                          onClick={() => { setEditingHabit(habit); setNewHabitTitle(habit.title); setNewHabitTarget(habit.targetValue); setNewHabitStartDate(habit.startDate); setNewHabitRecurrence(habit.recurrence); setSelectedIcon(habit.iconName); setSelectedColor(habit.color); setIsHabitModalOpen(true); }} 
+                          className="p-2 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-sm transition-all" 
+                          title="Editar"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => setHabitToDelete(habit)} 
+                          className="p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-sm transition-all" 
+                          title="Remover"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
                     </div>
                   </div>
                 ))
@@ -785,7 +801,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 <div className="relative group"><Settings2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-blue-500 transition-colors" size={16} /><input autoFocus required placeholder="Ex: Hidratação Protocolar..." className="w-full bg-slate-950 border border-slate-800 rounded-sm py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-blue-500 transition-all placeholder:text-slate-800" value={newHabitTitle} onChange={e => setNewHabitTitle(e.target.value)} /></div>
               </div>
 
-              {/* Meta Diária (Nova Opção) */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Meta Diária (Objetivo de Conclusão)</label>
                 <div className="flex items-center gap-3">
