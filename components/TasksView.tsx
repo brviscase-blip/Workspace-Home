@@ -5,7 +5,8 @@ import {
   CalendarDays, CheckCircle2, LayoutGrid, ClipboardEdit, Edit2, Check, X, 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap, Activity, Flame,
   Settings2, AlertTriangle, Book, Dumbbell, Droplets, Brain, Timer, Heart, 
-  Smile, Coffee, Laptop, ShieldCheck, Stars, Calendar, Info, Minus
+  Smile, Coffee, Laptop, ShieldCheck, Stars, Calendar, Info, Minus, BarChart3,
+  Trophy, TrendingUp, History, Layout
 } from 'lucide-react';
 import { DailyTask } from '../types';
 import { supabase } from '../lib/supabase';
@@ -21,9 +22,12 @@ interface Habit {
   targetValue: number; 
   recurrence: boolean[]; 
   streak: number;
+  maxStreak: number; // Novo: Recorde histórico
+  totalExecutions: number; // Novo: Volume total acumulado
   iconName: string;
   color: string;
   startDate: string;
+  history?: number[]; // Simulação de histórico de 30 dias para o relatório
 }
 
 const HABIT_ICONS = [
@@ -185,6 +189,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
+  const [reportHabit, setReportHabit] = useState<Habit | null>(null); // Novo: Habit para o relatório
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitTarget, setNewHabitTarget] = useState(1);
@@ -199,10 +204,50 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [habitToDelete, setHabitToDelete] = useState<Habit | null>(null);
   const [viewDate, setViewDate] = useState(new Date());
 
+  // Dados mockados enriquecidos para o exemplo
   const [habits, setHabits] = useState<Habit[]>([
-    { id: 'h1', title: 'Leitura Técnica', dailyProgress: [5, 10, 15, 0, 0, 0, 0], targetValue: 30, recurrence: [false, true, true, true, true, true, false], streak: 3, iconName: 'Book', color: '#3b82f6', startDate: '01 Jan, 2026' },
-    { id: 'h2', title: 'Atividade Física', dailyProgress: [1, 0, 1, 0, 1, 0, 0], targetValue: 1, recurrence: [false, true, false, true, false, true, false], streak: 1, iconName: 'Dumbbell', color: '#10b981', startDate: '15 Jan, 2026' },
-    { id: 'h3', title: 'Beber Água', dailyProgress: [4, 6, 8, 2, 0, 0, 0], targetValue: 10, recurrence: [true, true, true, true, true, true, true], streak: 0, iconName: 'Droplets', color: '#06b6d4', startDate: '20 Jan, 2026' },
+    { 
+      id: 'h1', 
+      title: 'Leitura Técnica', 
+      dailyProgress: [5, 10, 30, 0, 0, 0, 0], 
+      targetValue: 30, 
+      recurrence: [false, true, true, true, true, true, false], 
+      streak: 3, 
+      maxStreak: 12, 
+      totalExecutions: 342,
+      iconName: 'Book', 
+      color: '#3b82f6', 
+      startDate: '01 Jan, 2026',
+      history: Array.from({length: 30}, () => Math.floor(Math.random() * 2))
+    },
+    { 
+      id: 'h2', 
+      title: 'Atividade Física', 
+      dailyProgress: [1, 1, 1, 1, 1, 1, 1], 
+      targetValue: 1, 
+      recurrence: [false, true, false, true, false, true, false], 
+      streak: 1, 
+      maxStreak: 8, 
+      totalExecutions: 86,
+      iconName: 'Dumbbell', 
+      color: '#10b981', 
+      startDate: '15 Jan, 2026',
+      history: Array.from({length: 30}, () => Math.floor(Math.random() * 2))
+    },
+    { 
+      id: 'h3', 
+      title: 'Beber Água', 
+      dailyProgress: [4, 6, 8, 2, 0, 0, 0], 
+      targetValue: 10, 
+      recurrence: [true, true, true, true, true, true, true], 
+      streak: 0, 
+      maxStreak: 21, 
+      totalExecutions: 1240,
+      iconName: 'Droplets', 
+      color: '#06b6d4', 
+      startDate: '20 Jan, 2026',
+      history: Array.from({length: 30}, () => Math.floor(Math.random() * 2))
+    },
   ]);
 
   const fetchTodayTasks = async () => {
@@ -306,9 +351,12 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         targetValue: newHabitTarget,
         recurrence: newHabitRecurrence,
         streak: 0,
+        maxStreak: 0,
+        totalExecutions: 0,
         iconName: selectedIcon,
         color: selectedColor,
-        startDate: newHabitStartDate
+        startDate: newHabitStartDate,
+        history: Array.from({length: 30}, () => 0)
       };
       setHabits(prev => [...prev, newHabit]);
     }
@@ -630,10 +678,10 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               ) : (
                 habits.map(habit => (
                   <div key={habit.id} className="bg-slate-900/30 border border-slate-800 rounded-sm p-6 hover:border-slate-700 transition-all group shadow-sm">
-                    {/* REESTRUTURAÇÃO DO GRID: Identidade -> Grade -> Performance */}
-                    <div className="grid grid-cols-[300px_1fr_120px_auto] items-center gap-8">
+                    {/* GRID ATUALIZADO: [Identity] [Grade Semanal] [Insights (Espaço Laranja)] [Aderência] [Ações] */}
+                    <div className="grid grid-cols-[260px_auto_1fr_100px_auto] items-center gap-8">
                       
-                      {/* 1. IDENTIDADE (FIXO ESQUERDA) */}
+                      {/* 1. IDENTIDADE */}
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="w-11 h-11 rounded-sm border flex items-center justify-center transition-all flex-shrink-0" style={{ backgroundColor: `${habit.color}10`, borderColor: `${habit.color}30` }}>
                           <HabitIcon name={habit.iconName} color={habit.color} size={24} />
@@ -653,8 +701,8 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                         </div>
                       </div>
 
-                      {/* 2. GRADE SEMANAL (OCUPA O ESPAÇO CENTRAL RESTANTE) */}
-                      <div className="flex items-center justify-start gap-3">
+                      {/* 2. GRADE SEMANAL */}
+                      <div className="flex items-center justify-start gap-2 border-r border-slate-800/50 pr-8">
                         {habit.dailyProgress.map((val, idx) => {
                           const isRecurrentDay = habit.recurrence[idx];
                           const isDone = val >= habit.targetValue;
@@ -667,7 +715,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                                 disabled={!isRecurrentDay}
                                 onClick={() => incrementHabit(habit.id, idx)}
                                 onContextMenu={(e) => decrementHabit(e, habit.id, idx)}
-                                className={`w-10 h-10 rounded-sm border transition-all flex flex-col items-center justify-center relative overflow-hidden group/btn ${
+                                className={`w-9 h-9 rounded-sm border transition-all flex flex-col items-center justify-center relative overflow-hidden group/btn ${
                                   isDone 
                                     ? 'shadow-[0_0_15px_rgba(59,130,246,0.15)] text-white' 
                                     : 'bg-slate-950 border-slate-800 hover:border-slate-700'
@@ -680,14 +728,12 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                                 {isDone ? (
                                   <Check size={14} strokeWidth={4} className="animate-in zoom-in duration-300" />
                                 ) : (
-                                  <div className="flex flex-col items-center justify-center">
-                                    <span className="text-[9px] font-black text-slate-500 group-hover/btn:text-white transition-colors">{val}</span>
-                                    <div className="w-4 h-[1px] bg-slate-800 my-0.5" />
-                                    <span className="text-[8px] font-bold text-slate-700">{habit.targetValue}</span>
+                                  <div className="flex flex-col items-center justify-center scale-90">
+                                    <span className="text-[8px] font-black text-slate-500 group-hover/btn:text-white transition-colors">{val}</span>
+                                    <div className="w-3 h-[1px] bg-slate-800 my-0.5" />
+                                    <span className="text-[7px] font-bold text-slate-700">{habit.targetValue}</span>
                                   </div>
                                 )}
-                                
-                                {/* Barra de progresso interna discreta */}
                                 {!isDone && val > 0 && (
                                   <div className="absolute bottom-0 left-0 h-[2px] bg-blue-500/30 transition-all" style={{ width: `${currentPerc}%` }} />
                                 )}
@@ -697,8 +743,33 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                         })}
                       </div>
 
-                      {/* 3. ADERÊNCIA (FIXO DIREITA) */}
-                      <div className="text-right border-l border-slate-800 pl-6 pr-2">
+                      {/* 3. INSIGHTS (PREENCHENDO O ESPAÇO LARANJA) */}
+                      <div className="flex items-center gap-8 pl-4">
+                         <div className="flex flex-col gap-1">
+                            <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Ações Totais</span>
+                            <div className="flex items-center gap-2">
+                               <TrendingUp size={12} className="text-emerald-500" />
+                               <span className="text-sm font-black text-slate-300 tabular-nums">{habit.totalExecutions}</span>
+                            </div>
+                         </div>
+                         <div className="flex flex-col gap-1">
+                            <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Recorde</span>
+                            <div className="flex items-center gap-2">
+                               <Trophy size={12} className="text-amber-500" />
+                               <span className="text-sm font-black text-slate-300 tabular-nums">{habit.maxStreak}d</span>
+                            </div>
+                         </div>
+                         <div className="flex flex-col gap-1">
+                            <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Tendência</span>
+                            <div className="flex items-center gap-1">
+                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                               <span className="text-[10px] font-black text-emerald-500 uppercase">Consistente</span>
+                            </div>
+                         </div>
+                      </div>
+
+                      {/* 4. ADERÊNCIA */}
+                      <div className="text-right border-l border-slate-800 pl-8">
                         <div className="flex flex-col">
                            <span className="text-2xl font-black text-white tabular-nums leading-none">
                               {Math.round((habit.dailyProgress.filter((v, i) => v >= habit.targetValue && habit.recurrence[i]).length / habit.recurrence.filter(r => r).length) * 100)}%
@@ -707,8 +778,15 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                         </div>
                       </div>
 
-                      {/* 4. AÇÕES (FLUTUANTE NO HOVER) */}
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all pl-2">
+                      {/* 5. AÇÕES */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all pl-4">
+                        <button 
+                          onClick={() => setReportHabit(habit)} 
+                          className="p-2 text-slate-600 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-sm transition-all" 
+                          title="Relatório Analítico"
+                        >
+                          <BarChart3 size={16} />
+                        </button>
                         <button 
                           onClick={() => { setEditingHabit(habit); setNewHabitTitle(habit.title); setNewHabitTarget(habit.targetValue); setNewHabitStartDate(habit.startDate); setNewHabitRecurrence(habit.recurrence); setSelectedIcon(habit.iconName); setSelectedColor(habit.color); setIsHabitModalOpen(true); }} 
                           className="p-2 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-sm transition-all" 
@@ -733,6 +811,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </div>
         )}
 
+        {/* ... (resto do código igual) */}
         {activeSubTab === 'CALENDARIO' && (
           <div className="flex-1 flex flex-col animate-in zoom-in-95 duration-500 overflow-hidden">
             <div className="flex items-center justify-between mb-6">
@@ -785,6 +864,104 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </div>
         )}
       </div>
+
+      {/* NOVO: MODAL DE RELATÓRIO ANALÍTICO */}
+      {reportHabit && (
+        <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-300 px-4">
+          <div className="bg-[#030712] border border-slate-800 rounded-sm w-full max-w-2xl shadow-2xl animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-800 bg-black/20 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-sm border flex items-center justify-center" style={{ backgroundColor: `${reportHabit.color}10`, borderColor: `${reportHabit.color}30` }}>
+                  <HabitIcon name={reportHabit.iconName} color={reportHabit.color} size={28} />
+                </div>
+                <div className="flex flex-col">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white">{reportHabit.title}</h3>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Relatório de Performance Analítica</p>
+                </div>
+              </div>
+              <button onClick={() => setReportHabit(null)} className="text-slate-500 hover:text-white transition-colors"><X size={24} /></button>
+            </div>
+
+            <div className="p-8 overflow-y-auto custom-scrollbar space-y-10">
+              {/* KPIs de Topo */}
+              <div className="grid grid-cols-3 gap-6">
+                <div className="bg-slate-900/30 border border-slate-800 p-5 rounded-sm">
+                   <div className="flex items-center gap-2 mb-2">
+                      <Trophy size={14} className="text-amber-500" />
+                      <span className="text-[9px] font-black text-slate-500 uppercase">Recorde Histórico</span>
+                   </div>
+                   <div className="text-3xl font-black text-white tabular-nums">{reportHabit.maxStreak}d</div>
+                   <p className="text-[8px] font-bold text-slate-600 uppercase mt-1">Maior sequência de dias</p>
+                </div>
+                <div className="bg-slate-900/30 border border-slate-800 p-5 rounded-sm">
+                   <div className="flex items-center gap-2 mb-2">
+                      <Zap size={14} className="text-blue-500" />
+                      <span className="text-[9px] font-black text-slate-500 uppercase">Volume Global</span>
+                   </div>
+                   <div className="text-3xl font-black text-white tabular-nums">{reportHabit.totalExecutions}</div>
+                   <p className="text-[8px] font-bold text-slate-600 uppercase mt-1">Ações totais registradas</p>
+                </div>
+                <div className="bg-slate-900/30 border border-slate-800 p-5 rounded-sm">
+                   <div className="flex items-center gap-2 mb-2">
+                      <History size={14} className="text-purple-500" />
+                      <span className="text-[9px] font-black text-slate-500 uppercase">Marco Zero</span>
+                   </div>
+                   <div className="text-3xl font-black text-white tabular-nums">01</div>
+                   <p className="text-[8px] font-bold text-slate-600 uppercase mt-1">Jan, 2026 (Ativação)</p>
+                </div>
+              </div>
+
+              {/* Heatmap de Consistência (30 dias) */}
+              <div className="space-y-4">
+                 <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Heatmap de Consistência (Últimos 30 Dias)</h4>
+                    <div className="flex items-center gap-4">
+                       <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-[1px] bg-slate-900 border border-slate-800" /><span className="text-[8px] font-bold text-slate-600 uppercase">Nula</span></div>
+                       <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-[1px] bg-blue-600" /><span className="text-[8px] font-bold text-slate-600 uppercase">Concluída</span></div>
+                    </div>
+                 </div>
+                 <div className="grid grid-cols-10 gap-2 p-6 bg-black/40 rounded-sm border border-slate-800">
+                    {reportHabit.history?.map((val, idx) => (
+                      <div key={idx} className="flex flex-col items-center gap-2">
+                         <div className={`w-full aspect-square rounded-[2px] transition-all duration-500 ${val > 0 ? 'bg-blue-600 shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'bg-slate-900 border border-slate-800 opacity-30'}`} />
+                         <span className="text-[7px] font-bold text-slate-700">{idx + 1}</span>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+
+              {/* Tendência e Gráfico de Barras */}
+              <div className="grid grid-cols-2 gap-8">
+                 <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Eficiência Semanal</h4>
+                    <div className="space-y-3">
+                       {['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'].map((s, i) => (
+                         <div key={s} className="space-y-1.5">
+                            <div className="flex justify-between items-end">
+                               <span className="text-[9px] font-bold text-slate-500 uppercase">{s}</span>
+                               <span className="text-[10px] font-black text-white">{[80, 95, 40, 100][i]}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                               <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${[80, 95, 40, 100][i]}%` }} />
+                            </div>
+                         </div>
+                       ))}
+                    </div>
+                 </div>
+                 <div className="flex flex-col justify-center bg-slate-900/20 border border-slate-800 rounded-sm p-6 text-center">
+                    <TrendingUp size={32} className="text-emerald-500 mx-auto mb-4" />
+                    <h5 className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Status: Altamente Consistente</h5>
+                    <p className="text-[9px] text-slate-500 font-medium leading-relaxed mt-2 uppercase tracking-tighter">Performance 12% superior à média operacional do último ciclo.</p>
+                 </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-800 bg-black/20 flex justify-end">
+              <button onClick={() => setReportHabit(null)} className="px-8 py-3 bg-blue-600 text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-500 transition-all shadow-xl rounded-sm">Fechar Relatório</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE CADASTRO/EDIÇÃO DE HÁBITO */}
       {isHabitModalOpen && (
