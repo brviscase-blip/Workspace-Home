@@ -1,8 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Trash2, CheckCircle2, AlertTriangle, Info, Zap, X, Clock, LogOut, MessageSquare, Maximize2, Minimize2 } from 'lucide-react';
+import { Bell, Trash2, CheckCircle2, AlertTriangle, Info, Zap, X, Clock, LogOut, Maximize2, Minimize2 } from 'lucide-react';
 import { Notification, NotificationType } from './NotificationSystem';
-import ChatPanel from './ChatPanel';
 import { supabase } from '../lib/supabase';
 
 interface HeaderProps {
@@ -27,19 +26,13 @@ const Header: React.FC<HeaderProps> = ({
   onlineUsers = []
 }) => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-  const chatRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
         setIsPanelOpen(false);
-      }
-      if (chatRef.current && !chatRef.current.contains(event.target as Node)) {
-        setIsChatOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -53,28 +46,6 @@ const Header: React.FC<HeaderProps> = ({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    
-    const fetchUnread = async () => {
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('receiver_id', currentUser)
-        .eq('is_read', false);
-      setUnreadCount(count || 0);
-    };
-
-    fetchUnread();
-
-    const channel = supabase
-      .channel('unread-tracker')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, fetchUnread)
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [currentUser]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -121,27 +92,6 @@ const Header: React.FC<HeaderProps> = ({
           >
             {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
           </button>
-
-          <div className="relative" ref={chatRef}>
-            <button 
-              onClick={() => setIsChatOpen(!isChatOpen)}
-              className={`relative text-slate-400 hover:text-white transition-all active:scale-95 p-2 rounded-sm ${isChatOpen ? 'bg-blue-500/10 text-blue-400' : ''}`}
-              title="Chat Seguro"
-            >
-              <MessageSquare size={20} className={unreadCount > 0 ? 'animate-bounce' : ''} />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center bg-emerald-500 rounded-full border-2 border-[#020617] text-[8px] font-black text-white">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            {isChatOpen && (
-              <div className="absolute right-0 mt-4 w-[480px] animate-in fade-in slide-in-from-top-2 duration-200 shadow-2xl">
-                <ChatPanel currentUser={currentUser || ''} onClose={() => setIsChatOpen(false)} />
-              </div>
-            )}
-          </div>
 
           <div className="relative" ref={panelRef}>
             <button 

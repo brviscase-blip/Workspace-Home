@@ -14,7 +14,7 @@ import SubActivityModal from './components/SubActivityModal';
 import NotificationSystem, { Notification, NotificationType } from './components/NotificationSystem';
 import Login from './components/Login';
 import { ViewType, LayoutType, DemandItem, DemandStatus, Note, Folder, SubActivity, TimeEntry } from './types';
-import { LayoutGrid, List, Kanban, Plus, Loader2, Activity, CalendarDays, ChevronDown, Check, User, Gauge, Zap, TrendingUp, Terminal, Shield, Cpu, ChevronLeft, ChevronRight, FileText, UserCheck } from 'lucide-react';
+import { LayoutGrid, List, Kanban, Plus, Loader2, CalendarDays, ChevronDown, Check, Terminal, Shield, Cpu } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
 interface FilterState {
@@ -33,7 +33,6 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewType>('DEMANDAS');
   const [layout, setLayout] = useState<LayoutType>(() => (localStorage.getItem('artifacts_layout') as LayoutType) || 'TABLE');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [demands, setDemands] = useState<DemandItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -378,7 +377,6 @@ const App: React.FC = () => {
                 </button>
                 <div className="relative" ref={responsibleMenuRef}>
                   <button onClick={() => setIsResponsibleMenuOpen(!isResponsibleMenuOpen)} className={`flex items-center gap-3 px-6 py-2.5 rounded-sm bg-[#030712] border text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl ${filters.responsible ? 'border-blue-500/50 text-white' : 'border-slate-800 text-slate-400 hover:border-slate-700'}`}>
-                    <UserCheck size={14} className={filters.responsible ? 'text-blue-500' : 'text-slate-500'} />
                     {filters.responsible || 'Responsável'}
                     <ChevronDown size={14} className={`text-slate-500 transition-transform duration-300 ${isResponsibleMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
@@ -399,7 +397,6 @@ const App: React.FC = () => {
                 </div>
                 <div className="relative" ref={contractMenuRef}>
                   <button onClick={() => setIsContractMenuOpen(!isContractMenuOpen)} className={`flex items-center gap-3 px-6 py-2.5 rounded-sm bg-[#030712] border text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl ${filters.contract ? 'border-blue-500/50 text-white' : 'border-slate-800 text-slate-400 hover:border-slate-700'}`}>
-                    <FileText size={14} className={filters.contract ? 'text-blue-500' : 'text-slate-500'} />
                     {filters.contract || 'Contrato'}
                     <ChevronDown size={14} className={`text-slate-500 transition-transform duration-300 ${isContractMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
@@ -453,18 +450,6 @@ const App: React.FC = () => {
         
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="px-8 mb-4 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-6">
-                 <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${realtimeStatus === 'ONLINE' ? 'bg-emerald-500 shadow-[0_0_5px_#10b981]' : 'bg-rose-500'}`} />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Sincronização: {realtimeStatus}</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Operador: <span className="text-blue-500">{currentUser}</span></span>
-                 </div>
-              </div>
-            </div>
-
             <div className="px-8 flex-1 flex flex-col min-h-0 overflow-hidden">
               {isLoading ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-4">
@@ -482,22 +467,6 @@ const App: React.FC = () => {
                <div className="flex items-center gap-4"><span className="text-[9px] font-black text-slate-700 uppercase">Uptime: 100%</span><div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /><span className="text-[9px] font-black text-emerald-500 uppercase">Serviços Estáveis</span></div></div>
             </footer>
           </div>
-
-          <aside className={`hidden lg:flex flex-col bg-[#030712]/50 border-l border-slate-800 flex-shrink-0 transition-all duration-300 relative ${isRightSidebarCollapsed ? 'w-14' : 'w-[320px]'}`}>
-            <button onClick={() => setIsRightSidebarCollapsed(!isRightSidebarCollapsed)} className="absolute -left-3 top-20 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg border border-[#020617] hover:bg-blue-500 transition-all z-50 group">{isRightSidebarCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}</button>
-            <div className={`flex flex-col h-full overflow-hidden ${isRightSidebarCollapsed ? 'p-2 items-center' : 'p-6 overflow-y-auto custom-scrollbar'}`}>
-              {!isRightSidebarCollapsed ? (
-                <>
-                  <div className="flex items-center justify-between mb-8 animate-in fade-in duration-500"><h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 flex items-center gap-2"><Gauge size={14} className="text-blue-500" /> Squad Telemetry</h3><div className="px-2 py-0.5 rounded-sm bg-blue-600/10 border border-blue-500/30 text-[9px] font-black text-blue-400 uppercase tracking-widest">LIVE</div></div>
-                  <div className="space-y-8 animate-in slide-in-from-right-2 duration-500">
-                     <div className="bg-slate-900/30 border border-slate-800 p-4 rounded-sm"><div className="flex justify-between items-end mb-3"><span className="text-[9px] font-black text-slate-600 uppercase">Saúde Global</span><span className="text-lg font-black text-white">{demands.length > 0 ? Math.round((demands.filter(d => d.status === 'COMPLETED').length / demands.length) * 100) : 0}%</span></div><div className="h-1 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800"><div className="h-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" style={{ width: `${demands.length > 0 ? (demands.filter(d => d.status === 'COMPLETED').length / demands.length) * 100 : 0}%` }} /></div></div>
-                     <div className="space-y-4"><h4 className="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-2"><TrendingUp size={12} /> Carga Operacional</h4><div className="space-y-2">{existingOptions.responsibles.slice(0, 5).map(resp => { const count = demands.filter(d => d.responsible === resp && d.status !== 'COMPLETED').length; return (<div key={resp} className="flex flex-col gap-1 p-2 bg-black/20 rounded-sm border border-slate-800/50"><div className="flex justify-between items-center"><span className="text-[10px] font-bold text-slate-400 truncate pr-2">{resp}</span><span className="text-[9px] font-black text-blue-500">{count} ATIVAS</span></div><div className="h-0.5 w-full bg-slate-950 rounded-full"><div className="h-full bg-blue-600" style={{ width: `${Math.min(count * 20, 100)}%` }} /></div></div>); })}</div></div>
-                     <div className="space-y-4"><h4 className="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-2"><Zap size={12} className="text-amber-500" /> Próximos Alertas</h4><div className="space-y-2">{demands.filter(d => d.status !== 'COMPLETED').slice(0, 3).map(d => (<div key={d.id} className="flex items-center gap-3 p-3 bg-amber-500/5 border border-amber-500/10 rounded-sm"><div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_5px_#f59e0b]" /><div className="flex-1 min-w-0"><p className="text-[10px] font-black text-slate-200 uppercase truncate leading-tight">{d.title}</p><p className="text-[8px] font-bold text-slate-500 uppercase mt-1">{d.dueDate}</p></div></div>))}</div></div>
-                  </div>
-                </>
-              ) : <div className="flex flex-col items-center gap-8 py-4 opacity-40 hover:opacity-100 transition-opacity"><Gauge size={20} className="text-slate-400" /><div className="h-px w-6 bg-slate-800" /><TrendingUp size={20} className="text-slate-400" /><div className="h-px w-6 bg-slate-800" /><Zap size={20} className="text-slate-400" /></div>}
-            </div>
-          </aside>
         </div>
       </main>
 

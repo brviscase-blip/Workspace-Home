@@ -3,14 +3,21 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, Trash2, CheckCircle, Circle, Terminal, ListCheck, Loader2, Target, 
   CalendarDays, CheckCircle2, LayoutGrid, ClipboardEdit, Edit2, Check, X, 
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon 
+  ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap, Activity, Flame
 } from 'lucide-react';
 import { DailyTask } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface TasksViewProps { currentUser: string; }
 
-type SubTab = 'HOJE' | 'CALENDARIO' | 'CADASTRO';
+type SubTab = 'CALENDARIO' | 'HOJE' | 'HABITOS' | 'CADASTRO';
+
+interface Habit {
+  id: string;
+  title: string;
+  days: boolean[]; // 7 dias da semana
+  streak: number;
+}
 
 const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('HOJE');
@@ -23,6 +30,13 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   
   // Estado para o Calendário
   const [viewDate, setViewDate] = useState(new Date());
+
+  // Mock de hábitos (Poderia ser expandido para Supabase futuramente)
+  const [habits, setHabits] = useState<Habit[]>([
+    { id: 'h1', title: 'Leitura Técnica', days: [true, true, true, false, false, false, false], streak: 3 },
+    { id: 'h2', title: 'Atividade Física', days: [true, false, true, false, true, false, false], streak: 1 },
+    { id: 'h3', title: 'Meditação Protocolar', days: [true, true, true, true, true, true, false], streak: 6 },
+  ]);
 
   const fetchTodayTasks = async () => {
     try {
@@ -75,7 +89,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
 
     const channel = supabase
-      .channel('tasks-realtime-v6')
+      .channel('tasks-realtime-v7')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_tasks' }, () => {
         fetchTodayTasks();
         if (activeSubTab === 'CALENDARIO') fetchMonthTasks();
@@ -147,6 +161,17 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
   };
 
+  const toggleHabitDay = (habitId: string, dayIndex: number) => {
+    setHabits(prev => prev.map(h => {
+      if (h.id === habitId) {
+        const newDays = [...h.days];
+        newDays[dayIndex] = !newDays[dayIndex];
+        return { ...h, days: newDays };
+      }
+      return h;
+    }));
+  };
+
   // Lógica de Renderização do Calendário
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
@@ -167,6 +192,8 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
   const todayFormatted = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' }).format(new Date());
 
+  const weekDaysShort = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+
   return (
     <div className="flex flex-col h-full bg-[#020617] border border-slate-800 rounded-sm overflow-hidden animate-in fade-in duration-500">
       {/* Header da View */}
@@ -183,7 +210,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </div>
         </div>
         
-        {/* Sub-Navegação Expandida - Ordem atualizada: CALENDÁRIO antes de HOJE */}
+        {/* Sub-Navegação Expandida */}
         <div className="flex items-center bg-black/40 p-1 rounded-sm border border-slate-800">
           <button 
             onClick={() => setActiveSubTab('CALENDARIO')}
@@ -202,6 +229,14 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
             <LayoutGrid size={14} /> Hoje
           </button>
           <button 
+            onClick={() => setActiveSubTab('HABITOS')}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
+              activeSubTab === 'HABITOS' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <Zap size={14} /> Hábitos
+          </button>
+          <button 
             onClick={() => setActiveSubTab('CADASTRO')}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
               activeSubTab === 'CADASTRO' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
@@ -212,9 +247,10 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden w-full px-8 pt-8">
+      {/* Main Content Area com padding inferior ajustado (pb-12) para evitar colisão com a borda inferior */}
+      <div className="flex-1 flex flex-col overflow-hidden w-full px-8 pt-8 pb-12">
         
-        {/* VIEW: HOJE - Split-Focus (Original) */}
+        {/* VIEW: HOJE - Split-Focus */}
         {activeSubTab === 'HOJE' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full animate-in slide-in-from-right-4 duration-500">
             <div className="lg:col-span-7 flex flex-col h-full overflow-hidden">
@@ -275,10 +311,80 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </div>
         )}
 
-        {/* VIEW: CALENDÁRIO - Grid Mensal Gigante */}
+        {/* VIEW: HABITOS - Monitor de Rotinas */}
+        {activeSubTab === 'HABITOS' && (
+          <div className="flex flex-col h-full animate-in slide-in-from-bottom-4 duration-500">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500">Monitor de Rotinas</span>
+                <p className="text-[11px] font-bold text-slate-500 uppercase mt-1">Consistência Operacional Semanal</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-sm">
+                  <Flame size={14} className="text-emerald-500" />
+                  <span className="text-[10px] font-black text-emerald-400 uppercase">Foco Ativo</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 pb-10">
+              {habits.map(habit => (
+                <div key={habit.id} className="bg-slate-900/30 border border-slate-800 rounded-sm p-6 hover:border-slate-700 transition-all group">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4 min-w-[200px]">
+                      <div className="w-10 h-10 rounded-sm bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                        <Activity size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-[13px] font-black text-white uppercase tracking-tight">{habit.title}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Flame size={10} className="text-orange-500" />
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias Seguidores</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 grid grid-cols-7 gap-2 max-w-md">
+                      {habit.days.map((done, idx) => (
+                        <div key={idx} className="flex flex-col items-center gap-2">
+                          <span className="text-[8px] font-black text-slate-600 tracking-tighter">{weekDaysShort[idx]}</span>
+                          <button 
+                            onClick={() => toggleHabitDay(habit.id, idx)}
+                            className={`w-full aspect-square rounded-sm border transition-all flex items-center justify-center ${
+                              done 
+                                ? 'bg-blue-600 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white' 
+                                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            {done && <Check size={14} strokeWidth={4} />}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-col items-end">
+                      <div className="text-right">
+                        <span className="text-2xl font-black text-white tabular-nums">
+                          {Math.round((habit.days.filter(d => d).length / 7) * 100)}%
+                        </span>
+                        <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Aderência</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              <button className="w-full py-6 border border-dashed border-slate-800 rounded-sm text-slate-600 hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all flex flex-col items-center justify-center gap-2 group">
+                <Plus size={24} className="group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Adicionar Nova Rotina</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW: CALENDÁRIO */}
         {activeSubTab === 'CALENDARIO' && (
-          <div className="flex flex-col h-full animate-in zoom-in-95 duration-500 overflow-hidden">
-            {/* Navegação de Mês */}
+          <div className="flex-1 flex flex-col animate-in zoom-in-95 duration-500 overflow-hidden">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
                 <button 
@@ -305,16 +411,13 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               </button>
             </div>
 
-            {/* Grid do Calendário */}
-            <div className="flex-1 grid grid-cols-7 border-t border-l border-slate-800 overflow-hidden bg-slate-950/20">
-              {/* Dias da Semana */}
+            <div className="flex-1 grid grid-cols-7 border-t border-l border-slate-800 overflow-hidden bg-slate-950/20 rounded-sm">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map(d => (
                 <div key={d} className="p-3 border-r border-b border-slate-800 bg-black/40 text-center">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{d}</span>
                 </div>
               ))}
               
-              {/* Células de Dias */}
               {calendarDays.map((day, idx) => {
                 const isToday = day && day === new Date().getDate() && viewDate.getMonth() === new Date().getMonth() && viewDate.getFullYear() === new Date().getFullYear();
                 
@@ -326,7 +429,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 return (
                   <div 
                     key={idx} 
-                    className={`min-h-[100px] border-r border-b border-slate-800 p-2 transition-all group overflow-hidden ${
+                    className={`min-h-[80px] border-r border-b border-slate-800 p-2 transition-all group overflow-hidden ${
                       day ? 'bg-transparent' : 'bg-slate-900/10'
                     } ${isToday ? 'ring-2 ring-inset ring-blue-500 shadow-[inset_0_0_15px_rgba(59,130,246,0.1)]' : 'hover:bg-slate-900/20'}`}
                   >
