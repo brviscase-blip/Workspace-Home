@@ -5,7 +5,7 @@ import {
   CalendarDays, CheckCircle2, LayoutGrid, ClipboardEdit, Edit2, Check, X, 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap, Activity, Flame,
   Settings2, AlertTriangle, Book, Dumbbell, Droplets, Brain, Timer, Heart, 
-  Smile, Coffee, Laptop, ShieldCheck, Stars, Calendar, Info
+  Smile, Coffee, Laptop, ShieldCheck, Stars, Calendar, Info, Minus
 } from 'lucide-react';
 import { DailyTask } from '../types';
 import { supabase } from '../lib/supabase';
@@ -17,8 +17,9 @@ type SubTab = 'CALENDARIO' | 'HOJE' | 'HABITOS' | 'COTIDIANO';
 interface Habit {
   id: string;
   title: string;
-  days: boolean[]; // 7 dias da semana (status de conclusão na semana atual)
-  recurrence: boolean[]; // 7 dias da semana (quais dias o hábito deve ocorrer)
+  dailyProgress: number[]; // Progresso atual em cada dia (0-6)
+  targetValue: number; // Meta a ser atingida (ex: 8)
+  recurrence: boolean[]; // Quais dias o hábito ocorre
   streak: number;
   iconName: string;
   color: string;
@@ -57,7 +58,7 @@ interface CustomDatePickerProps {
   value: string;
   onChange: (val: string) => void;
   placeholder: string;
-  enabledDaysOfWeek?: number[]; // Array de índices (0=Dom, 1=Seg...)
+  enabledDaysOfWeek?: number[];
 }
 
 const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onChange, placeholder, enabledDaysOfWeek }) => {
@@ -155,7 +156,7 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
                       type="button" 
                       disabled={!isEnabled}
                       onClick={() => handleSelectDay(day)} 
-                      className={`w-full h-full rounded-sm text-[10px] font-bold transition-all flex flex-col items-center justify-center relative overflow-hidden ${
+                      className={`w-full h-full rounded-sm text-[10px] font-bold transition-all flex items-center justify-center relative overflow-hidden ${
                         !isEnabled
                           ? 'opacity-10 cursor-not-allowed'
                           : isSelected 
@@ -175,12 +176,6 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onCha
               })}
             </div>
           </div>
-          <div className="p-2 border-t border-slate-800/50 bg-black/20 flex justify-center">
-             <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full ring-1 ring-blue-500/50 bg-blue-500/10" />
-                <span className="text-[7px] font-black text-slate-600 uppercase tracking-widest">Apenas dias de execução disponíveis</span>
-             </div>
-          </div>
         </div>
       )}
     </div>
@@ -197,6 +192,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [newHabitTitle, setNewHabitTitle] = useState('');
+  const [newHabitTarget, setNewHabitTarget] = useState(1);
   const [newHabitStartDate, setNewHabitStartDate] = useState('');
   const [newHabitRecurrence, setNewHabitRecurrence] = useState<boolean[]>([true, true, true, true, true, true, true]);
   const [selectedIcon, setSelectedIcon] = useState('Activity');
@@ -212,12 +208,11 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   // Estado para o Calendário
   const [viewDate, setViewDate] = useState(new Date());
 
-  // Mock de hábitos
+  // Mock de hábitos atualizado com metas
   const [habits, setHabits] = useState<Habit[]>([
-    { id: 'h1', title: 'Leitura Técnica', days: [true, true, true, false, false, false, false], recurrence: [false, true, true, true, true, true, false], streak: 3, iconName: 'Book', color: '#3b82f6', startDate: '01 Jan, 2026' },
-    { id: 'h2', title: 'Atividade Física', days: [true, false, true, false, true, false, false], recurrence: [false, true, false, true, false, true, false], streak: 1, iconName: 'Dumbbell', color: '#10b981', startDate: '15 Jan, 2026' },
-    { id: 'h3', title: 'Meditação Protocolar', days: [true, true, true, true, true, true, false], recurrence: [true, true, true, true, true, true, true], streak: 6, iconName: 'Brain', color: '#8b5cf6', startDate: '05 Jan, 2026' },
-    { id: 'h4', title: 'Beber Água', days: [false, false, false, false, false, false, false], recurrence: [true, true, true, true, true, true, true], streak: 0, iconName: 'Droplets', color: '#06b6d4', startDate: '20 Jan, 2026' },
+    { id: 'h1', title: 'Leitura Técnica', dailyProgress: [5, 10, 15, 0, 0, 0, 0], targetValue: 30, recurrence: [false, true, true, true, true, true, false], streak: 3, iconName: 'Book', color: '#3b82f6', startDate: '01 Jan, 2026' },
+    { id: 'h2', title: 'Atividade Física', dailyProgress: [1, 0, 1, 0, 1, 0, 0], targetValue: 1, recurrence: [false, true, false, true, false, true, false], streak: 1, iconName: 'Dumbbell', color: '#10b981', startDate: '15 Jan, 2026' },
+    { id: 'h3', title: 'Beber Água', dailyProgress: [4, 6, 8, 2, 0, 0, 0], targetValue: 10, recurrence: [true, true, true, true, true, true, true], streak: 0, iconName: 'Droplets', color: '#06b6d4', startDate: '20 Jan, 2026' },
   ]);
 
   const fetchTodayTasks = async () => {
@@ -271,7 +266,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
 
     const channel = supabase
-      .channel('tasks-realtime-v7')
+      .channel('tasks-realtime-v12')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_tasks' }, () => {
         fetchTodayTasks();
         if (activeSubTab === 'CALENDARIO') fetchMonthTasks();
@@ -310,14 +305,15 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     if (editingHabit) {
       setHabits(prev => prev.map(h => 
         h.id === editingHabit.id 
-        ? { ...h, title: newHabitTitle.trim(), iconName: selectedIcon, color: selectedColor, startDate: newHabitStartDate, recurrence: newHabitRecurrence } 
+        ? { ...h, title: newHabitTitle.trim(), targetValue: newHabitTarget, iconName: selectedIcon, color: selectedColor, startDate: newHabitStartDate, recurrence: newHabitRecurrence } 
         : h
       ));
     } else {
       const newHabit: Habit = {
         id: `h-${Date.now()}`,
         title: newHabitTitle.trim(),
-        days: [false, false, false, false, false, false, false],
+        dailyProgress: [0, 0, 0, 0, 0, 0, 0],
+        targetValue: newHabitTarget,
         recurrence: newHabitRecurrence,
         streak: 0,
         iconName: selectedIcon,
@@ -328,6 +324,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
 
     setNewHabitTitle('');
+    setNewHabitTarget(1);
     setNewHabitStartDate('');
     setNewHabitRecurrence([true, true, true, true, true, true, true]);
     setEditingHabit(null);
@@ -339,7 +336,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     updated[idx] = !updated[idx];
     setNewHabitRecurrence(updated);
     
-    // Se a data de início atual não for mais válida com a nova recorrência, limpa a data
     if (newHabitStartDate) {
       const months: Record<string, number> = { 'Jan': 0, 'Fev': 1, 'Mar': 2, 'Abr': 3, 'Mai': 4, 'Jun': 5, 'Jul': 6, 'Ago': 7, 'Set': 8, 'Out': 9, 'Nov': 10, 'Dez': 11 };
       const parts = newHabitStartDate.replace(',', '').split(' ');
@@ -393,12 +389,33 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
   };
 
-  const toggleHabitDay = (habitId: string, dayIndex: number) => {
+  // --- LÓGICA DE INCREMENTO DE HÁBITO ---
+  const incrementHabit = (habitId: string, dayIndex: number) => {
     setHabits(prev => prev.map(h => {
       if (h.id === habitId) {
-        const newDays = [...h.days];
-        newDays[dayIndex] = !newDays[dayIndex];
-        return { ...h, days: newDays };
+        const newProgress = [...h.dailyProgress];
+        if (newProgress[dayIndex] < h.targetValue) {
+          newProgress[dayIndex] += 1;
+        } else {
+          // Se já bateu a meta, um clique pode resetar para 0 (opcional) ou não fazer nada
+          // Aqui vamos permitir "desfazer" a conclusão se já estiver no máximo
+          newProgress[dayIndex] = 0;
+        }
+        return { ...h, dailyProgress: newProgress };
+      }
+      return h;
+    }));
+  };
+
+  const decrementHabit = (e: React.MouseEvent, habitId: string, dayIndex: number) => {
+    e.preventDefault(); // Previne menu de contexto
+    setHabits(prev => prev.map(h => {
+      if (h.id === habitId) {
+        const newProgress = [...h.dailyProgress];
+        if (newProgress[dayIndex] > 0) {
+          newProgress[dayIndex] -= 1;
+        }
+        return { ...h, dailyProgress: newProgress };
       }
       return h;
     }));
@@ -429,26 +446,29 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
   const monthName = viewDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
   
-  // --- LÓGICA DE FILTRAGEM PARA A ABA HOJE ---
+  // --- LÓGICA DE PERFORMANCE DIÁRIA (PONDERADA) ---
   const todayDayIndex = new Date().getDay();
   const habitsForToday = useMemo(() => {
     return habits.filter(h => h.recurrence[todayDayIndex]);
   }, [habits, todayDayIndex]);
 
   const completedTodayTasks = tasks.filter(t => t.completed).length;
-  const completedTodayHabits = habitsForToday.filter(h => h.days[todayDayIndex]).length;
   
+  // A conclusão de hábitos agora é baseada na soma das porcentagens atingidas
+  const habitsPercentageSum = habitsForToday.reduce((acc, h) => {
+    return acc + (h.dailyProgress[todayDayIndex] / h.targetValue);
+  }, 0);
+
   const totalTodayItems = tasks.length + habitsForToday.length;
-  const completedTodayItems = completedTodayTasks + completedTodayHabits;
+  const weightedCompletedItems = completedTodayTasks + habitsPercentageSum;
   
-  const progressPercent = totalTodayItems > 0 ? Math.round((completedTodayItems / totalTodayItems) * 100) : 0;
-  const goalReached = totalTodayItems > 0 && progressPercent === 100;
-  // ---------------------------------------------
+  const progressPercent = totalTodayItems > 0 ? Math.round((weightedCompletedItems / totalTodayItems) * 100) : 0;
+  const goalReached = totalTodayItems > 0 && progressPercent >= 100;
+  // --------------------------------------------------
 
   const todayFormatted = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' }).format(new Date());
   const weekDaysShort = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
-  // Dias habilitados para o date picker baseado na recorrência
   const enabledDaysIndices = useMemo(() => {
     return newHabitRecurrence
       .map((active, idx) => active ? idx : -1)
@@ -472,38 +492,10 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         </div>
         
         <div className="flex items-center bg-black/40 p-1 rounded-sm border border-slate-800">
-          <button 
-            onClick={() => setActiveSubTab('CALENDARIO')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeSubTab === 'CALENDARIO' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <CalendarIcon size={14} /> Calendário
-          </button>
-          <button 
-            onClick={() => setActiveSubTab('HOJE')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeSubTab === 'HOJE' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <LayoutGrid size={14} /> Hoje
-          </button>
-          <button 
-            onClick={() => setActiveSubTab('HABITOS')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeSubTab === 'HABITOS' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <Zap size={14} /> Hábitos
-          </button>
-          <button 
-            onClick={() => setActiveSubTab('COTIDIANO')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeSubTab === 'COTIDIANO' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <ClipboardEdit size={14} /> Cotidiano
-          </button>
+          <button onClick={() => setActiveSubTab('CALENDARIO')} className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'CALENDARIO' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><CalendarIcon size={14} /> Calendário</button>
+          <button onClick={() => setActiveSubTab('HOJE')} className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'HOJE' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><LayoutGrid size={14} /> Hoje</button>
+          <button onClick={() => setActiveSubTab('HABITOS')} className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'HABITOS' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Zap size={14} /> Hábitos</button>
+          <button onClick={() => setActiveSubTab('COTIDIANO')} className={`flex items-center gap-2 px-4 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'COTIDIANO' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><ClipboardEdit size={14} /> Cotidiano</button>
         </div>
       </div>
 
@@ -519,15 +511,9 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               
               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6 pr-2 pb-10">
                 {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20 gap-4">
-                    <Loader2 className="animate-spin text-slate-700" size={32} />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Sincronizando...</span>
-                  </div>
+                  <div className="flex flex-col items-center justify-center py-20 gap-4"><Loader2 className="animate-spin text-slate-700" size={32} /><span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Sincronizando...</span></div>
                 ) : totalTodayItems === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20">
-                    <Terminal size={40} className="text-slate-700 mb-4" />
-                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Lista vazia para hoje</p>
-                  </div>
+                  <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20"><Terminal size={40} className="text-slate-700 mb-4" /><p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Lista vazia para hoje</p></div>
                 ) : (
                   <>
                     {/* Seção de Hábitos do Dia */}
@@ -535,30 +521,41 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                       <div className="space-y-3">
                         <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 border-l-2 border-blue-500 pl-3">Protocolos de Hábito</h4>
                         {habitsForToday.map(habit => {
-                          const isDone = habit.days[todayDayIndex];
+                          const currentVal = habit.dailyProgress[todayDayIndex];
+                          const targetVal = habit.targetValue;
+                          const isDone = currentVal >= targetVal;
+                          const perc = Math.min((currentVal / targetVal) * 100, 100);
+
                           return (
                             <div 
                               key={habit.id}
-                              className={`group flex items-center justify-between p-4 bg-slate-900/20 border rounded-sm transition-all duration-300 ${
-                                isDone ? 'border-emerald-500/10 opacity-40' : 'border-slate-800 hover:border-blue-500/30 hover:bg-slate-900/40 shadow-sm'
+                              className={`group flex items-center justify-between p-4 bg-slate-900/20 border rounded-sm transition-all duration-300 relative overflow-hidden ${
+                                isDone ? 'border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.05)]' : 'border-slate-800 hover:border-blue-500/30'
                               }`}
                             >
-                              <div className="flex items-center gap-5 flex-1 mr-4">
+                              {/* Barra de Progresso Interna */}
+                              <div className="absolute left-0 bottom-0 h-[2px] bg-blue-500/20 transition-all duration-500" style={{ width: `${perc}%`, backgroundColor: isDone ? '#10b981' : habit.color }} />
+
+                              <div className="flex items-center gap-5 flex-1 mr-4 relative z-10">
                                 <button 
-                                  onClick={() => toggleHabitDay(habit.id, todayDayIndex)} 
+                                  onClick={() => incrementHabit(habit.id, todayDayIndex)}
+                                  onContextMenu={(e) => decrementHabit(e, habit.id, todayDayIndex)}
                                   className={`flex-shrink-0 transition-all duration-300 transform active:scale-90 ${isDone ? 'text-emerald-500' : 'text-slate-700 hover:text-blue-500'}`}
                                 >
-                                  {isDone ? <CheckCircle2 size={22} strokeWidth={2.5} /> : <Circle size={22} strokeWidth={2.5} />}
+                                  {isDone ? <CheckCircle2 size={24} strokeWidth={2.5} /> : <div className="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-[9px] font-black">{currentVal}</div>}
                                 </button>
-                                <div className="flex items-center gap-3">
-                                   <HabitIcon name={habit.iconName} color={isDone ? '#475569' : habit.color} size={16} />
-                                   <span className={`text-[13px] font-black uppercase tracking-tight transition-all duration-500 ${isDone ? 'text-slate-600 line-through' : 'text-slate-200'}`}>
-                                      {habit.title}
-                                   </span>
+                                <div className="flex flex-col gap-0.5">
+                                   <div className="flex items-center gap-2">
+                                      <HabitIcon name={habit.iconName} color={isDone ? '#10b981' : habit.color} size={14} />
+                                      <span className={`text-[13px] font-black uppercase tracking-tight transition-all duration-500 ${isDone ? 'text-emerald-400' : 'text-slate-200'}`}>
+                                         {habit.title}
+                                      </span>
+                                   </div>
+                                   <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{currentVal} de {targetVal} conclusões</span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                 <Flame size={12} className={isDone ? "text-slate-700" : "text-orange-500"} />
+                              <div className="flex items-center gap-2 relative z-10">
+                                 <Flame size={12} className={isDone ? "text-orange-500" : "text-slate-700"} />
                                  <span className="text-[10px] font-bold text-slate-500 tabular-nums">{habit.streak}d</span>
                               </div>
                             </div>
@@ -574,12 +571,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                         <p className="text-[10px] font-bold text-slate-700 uppercase pl-3">Nenhuma tarefa pontual registrada</p>
                       ) : (
                         tasks.map(task => (
-                          <div 
-                            key={task.id}
-                            className={`group flex items-center justify-between p-4 bg-slate-900/20 border rounded-sm transition-all duration-300 ${
-                              task.completed ? 'border-emerald-500/10 opacity-40' : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900/40 shadow-sm'
-                            }`}
-                          >
+                          <div key={task.id} className={`group flex items-center justify-between p-4 bg-slate-900/20 border rounded-sm transition-all duration-300 ${task.completed ? 'border-emerald-500/10 opacity-40' : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900/40 shadow-sm'}`}>
                             <div className="flex items-center gap-5 flex-1 mr-4">
                               <button onClick={() => toggleTask(task.id, task.completed)} className={`flex-shrink-0 transition-all duration-300 transform active:scale-90 ${task.completed ? 'text-emerald-500' : 'text-slate-700 hover:text-blue-500'}`}>
                                 {task.completed ? <CheckCircle size={22} strokeWidth={2.5} /> : <Circle size={22} strokeWidth={2.5} />}
@@ -601,12 +593,12 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               <div className={`p-8 border transition-all duration-700 rounded-sm flex flex-col gap-6 w-full ${goalReached ? 'bg-emerald-500/5 border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.08)]' : 'bg-slate-900/20 border-slate-800 shadow-sm'}`}>
                 <div className="flex flex-col gap-6">
                   <div className="flex items-center justify-between">
-                    <div className={`w-12 h-12 rounded-sm flex items-center justify-center transition-all duration-500 ${goalReached ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-500'}`}><Target size={24} /></div>
+                    <div className={`w-12 h-12 rounded-sm flex items-center justify-center transition-all duration-500 ${goalReached ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-800 text-slate-500'}`}><Target size={24} /></div>
                     <div className="text-right"><span className={`text-3xl font-black tabular-nums transition-colors ${goalReached ? 'text-emerald-400' : 'text-slate-300'}`}>{progressPercent}%</span></div>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={`text-[12px] font-black uppercase tracking-[0.2em] transition-colors ${goalReached ? 'text-emerald-400' : 'text-slate-400'}`}>{goalReached ? 'Objetivo Cumprido' : 'Meta do Ciclo Diário'}</span>
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{completedTodayItems} de {totalTodayItems} execuções concluídas</span>
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{weightedCompletedItems.toFixed(1)} de {totalTodayItems} execuções concluídas</span>
                   </div>
                 </div>
                 <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800/50">
@@ -637,6 +629,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 onClick={() => {
                   setEditingHabit(null);
                   setNewHabitTitle('');
+                  setNewHabitTarget(1);
                   setNewHabitStartDate('');
                   setNewHabitRecurrence([true, true, true, true, true, true, true]);
                   setSelectedIcon('Activity');
@@ -652,61 +645,52 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 pb-10">
               {habits.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20">
-                  <Activity size={40} className="text-slate-700 mb-4" />
-                  <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Nenhum hábito configurado</p>
-                </div>
+                <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20"><Activity size={40} className="text-slate-700 mb-4" /><p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Nenhum hábito configurado</p></div>
               ) : (
                 habits.map(habit => (
                   <div key={habit.id} className="bg-slate-900/30 border border-slate-800 rounded-sm p-6 hover:border-slate-700 transition-all group shadow-sm">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                       <div className="flex items-center gap-4 min-w-[200px]">
-                        <div 
-                          className="w-10 h-10 rounded-sm border flex items-center justify-center transition-all"
-                          style={{ 
-                            backgroundColor: `${habit.color}10`, 
-                            borderColor: `${habit.color}30`,
-                            boxShadow: `0 0 10px ${habit.color}10`
-                          }}
-                        >
+                        <div className="w-10 h-10 rounded-sm border flex items-center justify-center transition-all" style={{ backgroundColor: `${habit.color}10`, borderColor: `${habit.color}30` }}>
                           <HabitIcon name={habit.iconName} color={habit.color} />
                         </div>
                         <div className="flex-1">
                           <h4 className="text-[13px] font-black text-white uppercase tracking-tight">{habit.title}</h4>
                           <div className="flex items-center gap-4 mt-1">
-                            <div className="flex items-center gap-2">
-                              <Flame size={10} className="text-orange-500" />
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3">
-                              <Calendar size={10} className="text-slate-600" />
-                              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{habit.startDate}</span>
-                            </div>
+                            <div className="flex items-center gap-2"><Flame size={10} className="text-orange-500" /><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias</span></div>
+                            <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3"><Calendar size={10} className="text-slate-600" /><span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{habit.startDate}</span></div>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex-1 grid grid-cols-7 gap-2 max-w-md">
-                        {habit.days.map((done, idx) => {
+                        {habit.dailyProgress.map((val, idx) => {
                           const isRecurrentDay = habit.recurrence[idx];
+                          const isDone = val >= habit.targetValue;
                           return (
                             <div key={idx} className={`flex flex-col items-center gap-2 transition-opacity ${!isRecurrentDay ? 'opacity-20' : ''}`}>
                               <span className="text-[8px] font-black text-slate-600 tracking-tighter">{weekDaysShort[idx]}</span>
                               <button 
                                 disabled={!isRecurrentDay}
-                                onClick={() => toggleHabitDay(habit.id, idx)}
-                                className={`w-full aspect-square rounded-sm border transition-all flex items-center justify-center ${
-                                  done 
-                                    ? 'shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white' 
+                                onClick={() => incrementHabit(habit.id, idx)}
+                                onContextMenu={(e) => decrementHabit(e, habit.id, idx)}
+                                className={`w-full aspect-square rounded-sm border transition-all flex flex-col items-center justify-center relative overflow-hidden ${
+                                  isDone 
+                                    ? 'shadow-[0_0_15px_rgba(59,130,246,0.2)] text-white' 
                                     : 'bg-slate-950 border-slate-800 hover:border-slate-700'
                                 }`}
                                 style={{ 
-                                  backgroundColor: done ? habit.color : '',
-                                  borderColor: done ? habit.color : ''
+                                  backgroundColor: isDone ? habit.color : '',
+                                  borderColor: isDone ? habit.color : ''
                                 }}
                               >
-                                {done && <Check size={14} strokeWidth={4} />}
-                                {!done && !isRecurrentDay && <div className="w-1 h-1 bg-slate-800 rounded-full" />}
+                                {isDone ? <Check size={14} strokeWidth={4} /> : (
+                                  <span className="text-[9px] font-black text-slate-500 group-hover:text-white transition-colors">{val}/{habit.targetValue}</span>
+                                )}
+                                {/* Mini Barra de Progresso Interna */}
+                                {!isDone && val > 0 && (
+                                  <div className="absolute bottom-0 left-0 h-[2px] bg-blue-500/50" style={{ width: `${(val / habit.targetValue) * 100}%` }} />
+                                )}
                               </button>
                             </div>
                           );
@@ -715,35 +699,14 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
                       <div className="flex items-center gap-6 min-w-[150px] justify-end">
                         <div className="text-right mr-2">
-                          <span className="text-2xl font-black text-white tabular-nums">
-                            {Math.round((habit.days.filter((d, i) => d && habit.recurrence[i]).length / habit.recurrence.filter(r => r).length) * 100)}%
-                          </span>
-                          <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Aderência</p>
+                           <span className="text-2xl font-black text-white tabular-nums">
+                              {Math.round((habit.dailyProgress.filter((v, i) => v >= habit.targetValue && habit.recurrence[i]).length / habit.recurrence.filter(r => r).length) * 100)}%
+                           </span>
+                           <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Aderência</p>
                         </div>
-                        
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                          <button 
-                            onClick={() => {
-                              setEditingHabit(habit);
-                              setNewHabitTitle(habit.title);
-                              setNewHabitStartDate(habit.startDate);
-                              setNewHabitRecurrence(habit.recurrence);
-                              setSelectedIcon(habit.iconName);
-                              setSelectedColor(habit.color);
-                              setIsHabitModalOpen(true);
-                            }}
-                            className="p-2 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-sm"
-                            title="Editar Hábito"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => setHabitToDelete(habit)}
-                            className="p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-sm"
-                            title="Remover Hábito"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <button onClick={() => { setEditingHabit(habit); setNewHabitTitle(habit.title); setNewHabitTarget(habit.targetValue); setNewHabitStartDate(habit.startDate); setNewHabitRecurrence(habit.recurrence); setSelectedIcon(habit.iconName); setSelectedColor(habit.color); setIsHabitModalOpen(true); }} className="p-2 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-sm" title="Editar Hábito"><Edit2 size={16} /></button>
+                          <button onClick={() => setHabitToDelete(habit)} className="p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-sm" title="Remover Hábito"><Trash2 size={16} /></button>
                         </div>
                       </div>
                     </div>
@@ -758,82 +721,25 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           <div className="flex-1 flex flex-col animate-in zoom-in-95 duration-500 overflow-hidden">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
-                  className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-sm transition-all"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <h3 className="text-lg font-black text-white uppercase tracking-[0.2em] min-w-[200px] text-center">
-                  {monthName}
-                </h3>
-                <button 
-                  onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
-                  className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-sm transition-all"
-                >
-                  <ChevronRight size={20} />
-                </button>
+                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-sm transition-all"><ChevronLeft size={20} /></button>
+                <h3 className="text-lg font-black text-white uppercase tracking-[0.2em] min-w-[200px] text-center">{monthName}</h3>
+                <button onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))} className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-sm transition-all"><ChevronRight size={20} /></button>
               </div>
-              <button 
-                onClick={() => setViewDate(new Date())}
-                className="px-4 py-2 border border-slate-800 rounded-sm text-[10px] font-black uppercase text-slate-500 hover:text-white hover:border-slate-600 transition-all"
-              >
-                Retornar ao Mês Atual
-              </button>
+              <button onClick={() => setViewDate(new Date())} className="px-4 py-2 border border-slate-800 rounded-sm text-[10px] font-black uppercase text-slate-500 hover:text-white hover:border-slate-600 transition-all">Retornar ao Mês Atual</button>
             </div>
 
             <div className="flex-1 grid grid-cols-7 border-t border-l border-slate-800 overflow-hidden bg-slate-950/20 rounded-sm">
-              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map(d => (
-                <div key={d} className="p-3 border-r border-b border-slate-800 bg-black/40 text-center">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{d}</span>
-                </div>
-              ))}
-              
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map(d => (<div key={d} className="p-3 border-r border-b border-slate-800 bg-black/40 text-center"><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{d}</span></div>))}
               {calendarDays.map((day, idx) => {
                 const isToday = day && day === new Date().getDate() && viewDate.getMonth() === new Date().getMonth() && viewDate.getFullYear() === new Date().getFullYear();
-                
-                const dayTasks = day ? calendarTasks.filter(t => {
-                  const d = new Date(t.created_at);
-                  return d.getDate() === day && d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
-                }) : [];
-
+                const dayTasks = day ? calendarTasks.filter(t => { const d = new Date(t.created_at); return d.getDate() === day && d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear(); }) : [];
                 return (
-                  <div 
-                    key={idx} 
-                    className={`min-h-[80px] border-r border-b border-slate-800 p-2 transition-all group overflow-hidden ${
-                      day ? 'bg-transparent' : 'bg-slate-900/10'
-                    } ${isToday ? 'ring-2 ring-inset ring-blue-500 shadow-[inset_0_0_15px_rgba(59,130,246,0.1)]' : 'hover:bg-slate-900/20'}`}
-                  >
+                  <div key={idx} className={`min-h-[80px] border-r border-b border-slate-800 p-2 transition-all group overflow-hidden ${day ? 'bg-transparent' : 'bg-slate-900/10'} ${isToday ? 'ring-2 ring-inset ring-blue-500 shadow-[inset_0_0_15px_rgba(59,130,246,0.1)]' : 'hover:bg-slate-900/20'}`}>
                     {day && (
                       <>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`text-[10px] font-black ${isToday ? 'text-blue-400' : 'text-slate-700'}`}>
-                            {day.toString().padStart(2, '0')}
-                          </span>
-                          {dayTasks.length > 0 && (
-                            <span className="text-[8px] font-bold text-slate-600 tabular-nums">
-                              {dayTasks.filter(t => t.completed).length}/{dayTasks.length}
-                            </span>
-                          )}
-                        </div>
+                        <div className="flex items-center justify-between mb-2"><span className={`text-[10px] font-black ${isToday ? 'text-blue-400' : 'text-slate-700'}`}>{day.toString().padStart(2, '0')}</span>{dayTasks.length > 0 && (<span className="text-[8px] font-bold text-slate-600 tabular-nums">{dayTasks.filter(t => t.completed).length}/{dayTasks.length}</span>)}</div>
                         <div className="flex flex-col gap-1">
-                          {dayTasks.slice(0, 4).map(t => (
-                            <div 
-                              key={t.id} 
-                              className={`text-[9px] font-bold py-0.5 px-1.5 rounded-[2px] truncate ${
-                                t.completed 
-                                  ? 'bg-emerald-500/5 text-emerald-500/40 line-through border-l border-emerald-500/20' 
-                                  : 'bg-blue-600/10 text-blue-400 border-l border-blue-500/50'
-                              }`}
-                            >
-                              {t.title}
-                            </div>
-                          ))}
-                          {dayTasks.length > 4 && (
-                            <span className="text-[8px] font-black text-slate-700 ml-1">
-                              + {dayTasks.length - 4} ITENS
-                            </span>
-                          )}
+                          {dayTasks.slice(0, 4).map(t => (<div key={t.id} className={`text-[9px] font-bold py-0.5 px-1.5 rounded-[2px] truncate ${t.completed ? 'bg-emerald-500/5 text-emerald-500/40 line-through border-l border-emerald-500/20' : 'bg-blue-600/10 text-blue-400 border-l border-blue-500/50'}`}>{t.title}</div>))}
                         </div>
                       </>
                     )}
@@ -847,86 +753,18 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         {activeSubTab === 'COTIDIANO' && (
           <div className="flex flex-col h-full animate-in slide-in-from-left-4 duration-500 max-w-4xl mx-auto w-full">
             <div className="mb-6 flex justify-start">
-              <button 
-                onClick={() => {
-                  setEditingHabit(null);
-                  setNewHabitTitle('');
-                  setNewHabitStartDate('');
-                  setNewHabitRecurrence([true, true, true, true, true, true, true]);
-                  setSelectedIcon('Activity');
-                  setSelectedColor('#3b82f6');
-                  setIsHabitModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-sm border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-400 hover:border-blue-500 hover:bg-blue-500/10 transition-all text-[10px] font-black uppercase tracking-[0.2em] group shadow-xl"
-              >
-                <Plus size={14} className="group-hover:scale-125 transition-transform" />
-                Registrar Novo Hábito
-              </button>
+              <button onClick={() => { setEditingHabit(null); setNewHabitTitle(''); setNewHabitTarget(1); setNewHabitStartDate(''); setNewHabitRecurrence([true, true, true, true, true, true, true]); setSelectedIcon('Activity'); setSelectedColor('#3b82f6'); setIsHabitModalOpen(true); }} className="flex items-center gap-2 px-6 py-2.5 rounded-sm border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-400 hover:border-blue-500 hover:bg-blue-500/10 transition-all text-[10px] font-black uppercase tracking-[0.2em] group shadow-xl"><Plus size={14} className="group-hover:scale-125 transition-transform" />Registrar Novo Hábito</button>
             </div>
-
-            <form onSubmit={addTask} className="mb-10 relative group w-full">
-              <div className="absolute -inset-0.5 bg-blue-600 rounded-sm blur-sm opacity-0 group-focus-within:opacity-10 transition duration-500"></div>
-              <div className="relative flex gap-2">
-                <input 
-                  autoFocus
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-sm px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-700 shadow-sm"
-                  placeholder="Novo item operacional..."
-                  value={newTaskTitle}
-                  onChange={e => setNewTaskTitle(e.target.value)}
-                />
-                <button 
-                  type="submit"
-                  disabled={!newTaskTitle.trim()}
-                  className="bg-blue-600 px-6 rounded-sm text-white hover:bg-blue-500 transition-all disabled:opacity-30 flex items-center justify-center shadow-md active:scale-95"
-                >
-                  <Plus size={20} strokeWidth={3} />
-                </button>
-              </div>
-            </form>
-
+            <form onSubmit={addTask} className="mb-10 relative group w-full"><div className="absolute -inset-0.5 bg-blue-600 rounded-sm blur-sm opacity-0 group-focus-within:opacity-10 transition duration-500"></div><div className="relative flex gap-2"><input autoFocus className="flex-1 bg-slate-950 border border-slate-800 rounded-sm px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-700 shadow-sm" placeholder="Novo item operacional..." value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} /><button type="submit" disabled={!newTaskTitle.trim()} className="bg-blue-600 px-6 rounded-sm text-white hover:bg-blue-500 transition-all disabled:opacity-30 flex items-center justify-center shadow-md active:scale-95"><Plus size={20} strokeWidth={3} /></button></div></form>
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2 pb-10">
-              {tasks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20">
-                  <Terminal size={40} className="text-slate-700 mb-4" />
-                  <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Aguardando registro de dados</p>
-                </div>
-              ) : (
-                tasks.map(task => (
-                  <div key={task.id} className="group flex items-center justify-between p-4 bg-slate-900/30 border border-slate-800 rounded-sm hover:border-slate-700 transition-all shadow-sm">
-                    <div className="flex items-center gap-5 flex-1 mr-4">
-                      {editingId === task.id ? (
-                        <div className="flex items-center gap-2 flex-1 animate-in fade-in duration-200">
-                          <input 
-                            autoFocus
-                            className="flex-1 bg-slate-950 border border-blue-500 rounded-sm px-3 py-1 text-sm text-white outline-none"
-                            value={editTitle}
-                            onChange={e => setEditTitle(e.target.value)}
-                            onKeyDown={e => {
-                              if(e.key === 'Enter') handleUpdateTask(task.id, editTitle);
-                              if(e.key === 'Escape') setEditingId(null);
-                            }}
-                          />
-                          <button onClick={() => handleUpdateTask(task.id, editTitle)} className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded-sm"><Check size={18} /></button>
-                          <button onClick={() => setEditingId(null)} className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-sm"><X size={18} /></button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${task.completed ? 'bg-emerald-500 shadow-[0_0_5px_#10b981]' : 'bg-slate-700'}`} />
-                          <span className={`text-[13px] font-bold tracking-tight ${task.completed ? 'text-slate-600 line-through' : 'text-slate-300'}`}>
-                            {task.title}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    {editingId !== task.id && (
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => { setEditingId(task.id); setEditTitle(task.title); }} className="text-slate-500 hover:text-blue-400 p-2 rounded-sm hover:bg-blue-500/10"><Edit2 size={15} /></button>
-                        <button onClick={() => deleteTask(task.id)} className="text-slate-500 hover:text-rose-500 p-2 rounded-sm hover:bg-rose-500/10"><Trash2 size={15} /></button>
-                      </div>
-                    )}
+              {tasks.length === 0 ? (<div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800/40 rounded-sm opacity-20"><Terminal size={40} className="text-slate-700 mb-4" /><p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600 text-center">Aguardando registro de dados</p></div>) : (tasks.map(task => (
+                <div key={task.id} className="group flex items-center justify-between p-4 bg-slate-900/30 border border-slate-800 rounded-sm hover:border-slate-700 transition-all shadow-sm">
+                  <div className="flex items-center gap-5 flex-1 mr-4">
+                    {editingId === task.id ? (<div className="flex items-center gap-2 flex-1 animate-in fade-in duration-200"><input autoFocus className="flex-1 bg-slate-950 border border-blue-500 rounded-sm px-3 py-1 text-sm text-white outline-none" value={editTitle} onChange={e => setEditTitle(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') handleUpdateTask(task.id, editTitle); if(e.key === 'Escape') setEditingId(null); }} /><button onClick={() => handleUpdateTask(task.id, editTitle)} className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded-sm"><Check size={18} /></button><button onClick={() => setEditingId(null)} className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-sm"><X size={18} /></button></div>) : (<><div className={`w-2 h-2 rounded-full flex-shrink-0 ${task.completed ? 'bg-emerald-500 shadow-[0_0_5px_#10b981]' : 'bg-slate-700'}`} /><span className={`text-[13px] font-bold tracking-tight ${task.completed ? 'text-slate-600 line-through' : 'text-slate-300'}`}>{task.title}</span></>)}
                   </div>
-                ))
-              )}
+                  {editingId !== task.id && (<div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all"><button onClick={() => { setEditingId(task.id); setEditTitle(task.title); }} className="text-slate-500 hover:text-blue-400 p-2 rounded-sm hover:bg-blue-500/10"><Edit2 size={15} /></button><button onClick={() => deleteTask(task.id)} className="text-slate-500 hover:text-rose-500 p-2 rounded-sm hover:bg-rose-500/10"><Trash2 size={15} /></button></div>)}
+                </div>
+              )))}
             </div>
           </div>
         )}
@@ -937,159 +775,50 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300 px-4">
           <div className="bg-[#030712] border border-slate-800 rounded-sm w-full max-w-lg shadow-2xl animate-in zoom-in duration-300 overflow-visible max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-slate-800 bg-black/20 flex items-center justify-between flex-shrink-0">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
-                   <Zap size={14} className="text-blue-500" /> Protocolo de Rotina
-                </h3>
-                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                  {editingHabit ? 'Atualizar parâmetros da rotina' : 'Configurar novo hábito operacional'}
-                </p>
-              </div>
-              <button 
-                onClick={() => {
-                  setIsHabitModalOpen(false);
-                  setEditingHabit(null);
-                }}
-                className="text-slate-500 hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex flex-col gap-1"><h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2"><Zap size={14} className="text-blue-500" /> Protocolo de Rotina</h3><p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{editingHabit ? 'Atualizar parâmetros da rotina' : 'Configurar novo hábito operacional'}</p></div>
+              <button onClick={() => { setIsHabitModalOpen(false); setEditingHabit(null); }} className="text-slate-500 hover:text-white transition-colors"><X size={20} /></button>
             </div>
 
             <form onSubmit={handleSaveHabit} className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-              {/* Título */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Identificação da Rotina</label>
-                <div className="relative group">
-                   <Settings2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-blue-500 transition-colors" size={16} />
-                   <input 
-                      autoFocus
-                      required
-                      placeholder="Ex: Leitura de Logs de Segurança..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-sm py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all placeholder:text-slate-800"
-                      value={newHabitTitle}
-                      onChange={e => setNewHabitTitle(e.target.value)}
-                   />
+                <div className="relative group"><Settings2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within:text-blue-500 transition-colors" size={16} /><input autoFocus required placeholder="Ex: Hidratação Protocolar..." className="w-full bg-slate-950 border border-slate-800 rounded-sm py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-blue-500 transition-all placeholder:text-slate-800" value={newHabitTitle} onChange={e => setNewHabitTitle(e.target.value)} /></div>
+              </div>
+
+              {/* Meta Diária (Nova Opção) */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Meta Diária (Objetivo de Conclusão)</label>
+                <div className="flex items-center gap-3">
+                   <button type="button" onClick={() => setNewHabitTarget(Math.max(1, newHabitTarget - 1))} className="w-10 h-10 rounded-sm bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-500 hover:text-white transition-all"><Minus size={16} /></button>
+                   <div className="flex-1 bg-slate-950 border border-slate-800 rounded-sm py-2 flex flex-col items-center justify-center">
+                      <span className="text-lg font-black text-blue-500">{newHabitTarget}</span>
+                      <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Ações por Dia</span>
+                   </div>
+                   <button type="button" onClick={() => setNewHabitTarget(newHabitTarget + 1)} className="w-10 h-10 rounded-sm bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-500 hover:text-white transition-all"><Plus size={16} /></button>
                 </div>
               </div>
 
-              {/* Recorrência Semana */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Recorrência Semana</label>
-                <div className="grid grid-cols-7 gap-1.5">
-                   {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
-                     <button
-                       key={idx}
-                       type="button"
-                       onClick={() => toggleRecurrenceDay(idx)}
-                       className={`aspect-square rounded-sm border text-[10px] font-black transition-all flex items-center justify-center ${
-                         newHabitRecurrence[idx] 
-                           ? 'bg-blue-600 border-blue-500 text-white shadow-lg' 
-                           : 'bg-slate-950 border-slate-800 text-slate-600 hover:border-slate-700'
-                       }`}
-                     >
-                       {day}
-                     </button>
-                   ))}
-                </div>
-                <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest mt-2 flex items-center gap-1.5">
-                  <Info size={10} className="text-blue-500" /> A data de início será restrita aos dias selecionados acima
-                </p>
+                <div className="grid grid-cols-7 gap-1.5">{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (<button key={idx} type="button" onClick={() => toggleRecurrenceDay(idx)} className={`aspect-square rounded-sm border text-[10px] font-black transition-all flex items-center justify-center ${newHabitRecurrence[idx] ? 'bg-blue-600 border-blue-500 text-white shadow-lg' : 'bg-slate-950 border-slate-800 text-slate-600 hover:border-slate-700'}`}>{day}</button>))}</div>
+                <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest mt-2 flex items-center gap-1.5"><Info size={10} className="text-blue-500" /> A data de início será restrita aos dias selecionados acima</p>
               </div>
 
-              {/* Data de Início Customizada */}
-              <CustomDatePicker 
-                label="Data do Início (Marco Zero)"
-                placeholder="Selecione a data de ativação..."
-                value={newHabitStartDate}
-                onChange={setNewHabitStartDate}
-                enabledDaysOfWeek={enabledDaysIndices}
-              />
+              <CustomDatePicker label="Data do Início (Marco Zero)" placeholder="Selecione a data de ativação..." value={newHabitStartDate} onChange={setNewHabitStartDate} enabledDaysOfWeek={enabledDaysIndices} />
 
-              {/* Seletor de Ícones */}
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Assinatura Visual (Ícone)</label>
-                <div className="grid grid-cols-6 gap-2">
-                  {HABIT_ICONS.map((item) => {
-                    const IconComp = item.icon;
-                    const isSelected = selectedIcon === item.name;
-                    return (
-                      <button
-                        key={item.name}
-                        type="button"
-                        onClick={() => setSelectedIcon(item.name)}
-                        className={`aspect-square rounded-sm border flex items-center justify-center transition-all ${
-                          isSelected 
-                            ? 'bg-blue-600/20 border-blue-500 text-blue-400 scale-110 shadow-lg' 
-                            : 'bg-slate-950 border-slate-800 text-slate-600 hover:border-slate-600 hover:text-slate-400'
-                        }`}
-                        title={item.name}
-                      >
-                        <IconComp size={20} />
-                      </button>
-                    );
-                  })}
-                </div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Assinatura Visual</label>
+                <div className="grid grid-cols-6 gap-2">{HABIT_ICONS.map((item) => { const IconComp = item.icon; const isSelected = selectedIcon === item.name; return (<button key={item.name} type="button" onClick={() => setSelectedIcon(item.name)} className={`aspect-square rounded-sm border flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600/20 border-blue-500 text-blue-400 scale-110' : 'bg-slate-950 border-slate-800 text-slate-600 hover:border-slate-600'}`} title={item.name}><IconComp size={20} /></button>); })}</div>
               </div>
 
-              {/* Seletor de Cores */}
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Cromatismo Operacional (Cor)</label>
-                <div className="flex flex-wrap gap-3">
-                  {HABIT_COLORS.map((color) => {
-                    const isSelected = selectedColor === color.value;
-                    return (
-                      <button
-                        key={color.name}
-                        type="button"
-                        onClick={() => setSelectedColor(color.value)}
-                        className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center ${
-                          isSelected ? 'border-white scale-125 shadow-xl' : 'border-transparent'
-                        }`}
-                        style={{ backgroundColor: color.value }}
-                      >
-                        {isSelected && <Check size={14} className="text-white drop-shadow-md" strokeWidth={4} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Preview */}
-              <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-sm flex items-start gap-4">
-                 <div className="w-12 h-12 rounded-sm border flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${selectedColor}15`, borderColor: `${selectedColor}40` }}>
-                    <HabitIcon name={selectedIcon} color={selectedColor} size={24} />
-                 </div>
-                 <div className="flex-1 min-w-0">
-                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-1">Resumo do Protocolo</span>
-                    <p className="text-[11px] text-slate-200 font-bold uppercase truncate">
-                       {newHabitTitle || 'Aguardando título...'}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                       <Calendar size={10} className="text-slate-600" />
-                       <span className="text-[9px] font-black text-slate-500 uppercase">{newHabitStartDate || 'Selecione uma data válida'}</span>
-                    </div>
-                 </div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Cromatismo Operacional</label>
+                <div className="flex flex-wrap gap-3">{HABIT_COLORS.map((color) => { const isSelected = selectedColor === color.value; return (<button key={color.name} type="button" onClick={() => setSelectedColor(color.value)} className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center ${isSelected ? 'border-white scale-125' : 'border-transparent'}`} style={{ backgroundColor: color.value }}>{isSelected && <Check size={14} className="text-white drop-shadow-md" strokeWidth={4} />}</button>); })}</div>
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setIsHabitModalOpen(false);
-                    setEditingHabit(null);
-                  }}
-                  className="flex-1 px-4 py-3 border border-slate-800 rounded-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-800 transition-all"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  disabled={!newHabitTitle.trim() || !newHabitStartDate || newHabitRecurrence.filter(r => r).length === 0}
-                  className="flex-1 px-4 py-3 bg-blue-600 rounded-sm text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-30"
-                >
-                  {editingHabit ? 'Salvar Alterações' : 'Ativar Hábito'}
-                </button>
+                <button type="button" onClick={() => { setIsHabitModalOpen(false); setEditingHabit(null); }} className="flex-1 px-4 py-3 border border-slate-800 rounded-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-800 transition-all">Cancelar</button>
+                <button type="submit" disabled={!newHabitTitle.trim() || !newHabitStartDate || newHabitRecurrence.filter(r => r).length === 0} className="flex-1 px-4 py-3 bg-blue-600 rounded-sm text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-30">{editingHabit ? 'Salvar Alterações' : 'Ativar Hábito'}</button>
               </div>
             </form>
           </div>
@@ -1099,32 +828,14 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
       {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
       {habitToDelete && (
         <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/85 backdrop-blur-sm animate-in fade-in duration-200 px-4" onClick={() => setHabitToDelete(null)}>
-          <div 
-            className="bg-[#030712] border border-rose-500/30 rounded-sm w-full max-w-sm p-8 shadow-2xl shadow-rose-500/10 animate-in zoom-in duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-[#030712] border border-rose-500/30 rounded-sm w-full max-w-sm p-8 shadow-2xl animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mb-6 border border-rose-500/20">
-                <AlertTriangle size={32} className="text-rose-500 animate-pulse" />
-              </div>
+              <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mb-6 border border-rose-500/20"><AlertTriangle size={32} className="text-rose-500 animate-pulse" /></div>
               <h3 className="text-[12px] font-black uppercase tracking-[0.3em] text-white mb-2">Protocolo de Exclusão</h3>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-8 leading-relaxed">
-                Confirmar remoção permanente do hábito <span className="text-rose-400">"{habitToDelete.title}"</span>? Esta ação não pode ser revertida.
-              </p>
-              
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-8 leading-relaxed">Confirmar remoção permanente do hábito <span className="text-rose-400">"{habitToDelete.title}"</span>? Esta ação não pode ser revertida.</p>
               <div className="flex gap-4 w-full">
-                <button 
-                  onClick={() => setHabitToDelete(null)}
-                  className="flex-1 px-4 py-3 border border-slate-800 rounded-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-800 transition-all"
-                >
-                  Abortar
-                </button>
-                <button 
-                  onClick={confirmDeleteHabit}
-                  className="flex-1 px-4 py-3 bg-rose-600 rounded-sm text-[10px] font-black uppercase tracking-widest text-white hover:bg-rose-500 shadow-lg shadow-rose-500/20 transition-all"
-                >
-                  Confirmar
-                </button>
+                <button onClick={() => setHabitToDelete(null)} className="flex-1 px-4 py-3 border border-slate-800 rounded-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-800 transition-all">Abortar</button>
+                <button onClick={confirmDeleteHabit} className="flex-1 px-4 py-3 bg-rose-600 rounded-sm text-[10px] font-black uppercase tracking-widest text-white hover:bg-rose-500 shadow-lg transition-all">Confirmar</button>
               </div>
             </div>
           </div>
