@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap, Activity, Flame,
   Settings2, AlertTriangle, Book, Dumbbell, Droplets, Brain, Timer, Heart, 
   Smile, Coffee, Laptop, ShieldCheck, Stars, Calendar, Info, Minus, BarChart3,
-  Trophy, TrendingUp, History, Layout
+  Trophy, TrendingUp, History, Layout, PieChart
 } from 'lucide-react';
 import { DailyTask } from '../types';
 import { supabase } from '../lib/supabase';
@@ -22,12 +22,12 @@ interface Habit {
   targetValue: number; 
   recurrence: boolean[]; 
   streak: number;
-  maxStreak: number; // Novo: Recorde histórico
-  totalExecutions: number; // Novo: Volume total acumulado
+  maxStreak: number; 
+  totalExecutions: number; 
   iconName: string;
   color: string;
   startDate: string;
-  history?: number[]; // Simulação de histórico de 30 dias para o relatório
+  history?: number[]; 
 }
 
 const HABIT_ICONS = [
@@ -189,12 +189,12 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
-  const [reportHabit, setReportHabit] = useState<Habit | null>(null); // Novo: Habit para o relatório
+  const [reportHabit, setReportHabit] = useState<Habit | null>(null); 
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitTarget, setNewHabitTarget] = useState(1);
   const [newHabitStartDate, setNewHabitStartDate] = useState('');
-  const [newHabitRecurrence, setNewHabitRecurrence] = useState<boolean[]>([true, true, true, true, true, true, true]);
+  const [newHabitRecurrence, setnewHabitRecurrence] = useState<boolean[]>([true, true, true, true, true, true, true]);
   const [selectedIcon, setSelectedIcon] = useState('Activity');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   
@@ -204,7 +204,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [habitToDelete, setHabitToDelete] = useState<Habit | null>(null);
   const [viewDate, setViewDate] = useState(new Date());
 
-  // Dados mockados enriquecidos para o exemplo
   const [habits, setHabits] = useState<Habit[]>([
     { 
       id: 'h1', 
@@ -364,7 +363,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     setNewHabitTitle('');
     setNewHabitTarget(1);
     setNewHabitStartDate('');
-    setNewHabitRecurrence([true, true, true, true, true, true, true]);
+    setnewHabitRecurrence([true, true, true, true, true, true, true]);
     setEditingHabit(null);
     setIsHabitModalOpen(false);
   };
@@ -372,7 +371,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const toggleRecurrenceDay = (idx: number) => {
     const updated = [...newHabitRecurrence];
     updated[idx] = !updated[idx];
-    setNewHabitRecurrence(updated);
+    setnewHabitRecurrence(updated);
     
     if (newHabitStartDate) {
       const months: Record<string, number> = { 'Jan': 0, 'Fev': 1, 'Mar': 2, 'Abr': 3, 'Mai': 4, 'Jun': 5, 'Jul': 6, 'Ago': 7, 'Set': 8, 'Out': 9, 'Nov': 10, 'Dez': 11 };
@@ -660,7 +659,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                   setNewHabitTitle('');
                   setNewHabitTarget(1);
                   setNewHabitStartDate('');
-                  setNewHabitRecurrence([true, true, true, true, true, true, true]);
+                  setnewHabitRecurrence([true, true, true, true, true, true, true]);
                   setSelectedIcon('Activity');
                   setSelectedColor('#3b82f6');
                   setIsHabitModalOpen(true);
@@ -678,64 +677,52 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               ) : (
                 habits.map(habit => (
                   <div key={habit.id} className="bg-slate-900/30 border border-slate-800 rounded-sm p-6 hover:border-slate-700 transition-all group shadow-sm">
-                    {/* GRID ATUALIZADO: [Identity] [Grade Semanal] [Insights (Espaço Laranja)] [Aderência] [Ações] */}
-                    <div className="grid grid-cols-[260px_auto_1fr_100px_auto] items-center gap-8">
+                    {/* GRID DE 4 ZONAS: [Identidade] [Grade] [Régua de KPIs de 4 Colunas] [Aderência + Ações] */}
+                    <div className="grid grid-cols-[200px_auto_1fr_120px] items-center gap-8">
                       
-                      {/* 1. IDENTIDADE */}
+                      {/* 1. IDENTIDADE DA ROTINA */}
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="w-11 h-11 rounded-sm border flex items-center justify-center transition-all flex-shrink-0" style={{ backgroundColor: `${habit.color}10`, borderColor: `${habit.color}30` }}>
                           <HabitIcon name={habit.iconName} color={habit.color} size={24} />
                         </div>
                         <div className="min-w-0">
                           <h4 className="text-[13px] font-black text-white uppercase tracking-tight truncate">{habit.title}</h4>
-                          <div className="flex items-center gap-3 mt-1">
-                            <div className="flex items-center gap-1.5">
-                              <Flame size={10} className="text-orange-500" />
-                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3">
-                              <Calendar size={10} className="text-slate-600" />
-                              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{habit.startDate}</span>
+                          <div className="flex flex-col gap-0.5 mt-1">
+                            <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">{habit.startDate}</span>
+                            <div className="flex items-center gap-1">
+                               <Flame size={8} className="text-orange-500" />
+                               <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">{habit.streak}d Ativo</span>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* 2. GRADE SEMANAL */}
-                      <div className="flex items-center justify-start gap-2 border-r border-slate-800/50 pr-8">
+                      {/* 2. GRADE SEMANAL COMPACTA */}
+                      <div className="flex items-center gap-1.5 border-r border-slate-800/50 pr-8">
                         {habit.dailyProgress.map((val, idx) => {
                           const isRecurrentDay = habit.recurrence[idx];
                           const isDone = val >= habit.targetValue;
                           const currentPerc = (val / habit.targetValue) * 100;
                           
                           return (
-                            <div key={idx} className={`flex flex-col items-center gap-1.5 transition-opacity ${!isRecurrentDay ? 'opacity-20' : ''}`}>
-                              <span className="text-[8px] font-black text-slate-600 tracking-tighter uppercase">{weekDaysShort[idx]}</span>
+                            <div key={idx} className={`flex flex-col items-center gap-1 transition-opacity ${!isRecurrentDay ? 'opacity-20' : ''}`}>
+                              <span className="text-[7px] font-black text-slate-600 tracking-tighter uppercase">{weekDaysShort[idx]}</span>
                               <button 
                                 disabled={!isRecurrentDay}
                                 onClick={() => incrementHabit(habit.id, idx)}
                                 onContextMenu={(e) => decrementHabit(e, habit.id, idx)}
-                                className={`w-9 h-9 rounded-sm border transition-all flex flex-col items-center justify-center relative overflow-hidden group/btn ${
-                                  isDone 
-                                    ? 'shadow-[0_0_15px_rgba(59,130,246,0.15)] text-white' 
-                                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                                className={`w-8 h-8 rounded-sm border transition-all flex items-center justify-center relative overflow-hidden group/btn ${
+                                  isDone ? 'text-white shadow-[0_0_10px_rgba(59,130,246,0.2)]' : 'bg-slate-950 border-slate-800 hover:border-slate-700'
                                 }`}
-                                style={{ 
-                                  backgroundColor: isDone ? habit.color : '',
-                                  borderColor: isDone ? habit.color : ''
-                                }}
+                                style={{ backgroundColor: isDone ? habit.color : '', borderColor: isDone ? habit.color : '' }}
                               >
                                 {isDone ? (
-                                  <Check size={14} strokeWidth={4} className="animate-in zoom-in duration-300" />
+                                  <Check size={12} strokeWidth={4} className="animate-in zoom-in duration-300" />
                                 ) : (
-                                  <div className="flex flex-col items-center justify-center scale-90">
-                                    <span className="text-[8px] font-black text-slate-500 group-hover/btn:text-white transition-colors">{val}</span>
-                                    <div className="w-3 h-[1px] bg-slate-800 my-0.5" />
-                                    <span className="text-[7px] font-bold text-slate-700">{habit.targetValue}</span>
-                                  </div>
+                                  <span className="text-[9px] font-black text-slate-600 group-hover/btn:text-white transition-colors">{val}</span>
                                 )}
                                 {!isDone && val > 0 && (
-                                  <div className="absolute bottom-0 left-0 h-[2px] bg-blue-500/30 transition-all" style={{ width: `${currentPerc}%` }} />
+                                  <div className="absolute bottom-0 left-0 h-[1.5px] bg-blue-500/30 transition-all" style={{ width: `${currentPerc}%` }} />
                                 )}
                               </button>
                             </div>
@@ -743,64 +730,77 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                         })}
                       </div>
 
-                      {/* 3. INSIGHTS (PREENCHENDO O ESPAÇO LARANJA) */}
-                      <div className="flex items-center gap-8 pl-4">
+                      {/* 3. RÉGUA DE INSIGHTS (DISTRIBUIÇÃO HORIZONTAL EM 4 COLUNAS) */}
+                      <div className="grid grid-cols-4 gap-4 px-8 border-r border-slate-800/50 items-center h-full">
+                         {/* COLUNA 1: VOLUME (VERMELHO NA ANOTAÇÃO) */}
                          <div className="flex flex-col gap-1">
-                            <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Ações Totais</span>
-                            <div className="flex items-center gap-2">
-                               <TrendingUp size={12} className="text-emerald-500" />
-                               <span className="text-sm font-black text-slate-300 tabular-nums">{habit.totalExecutions}</span>
+                            <span className="text-[7px] font-black text-slate-600 uppercase tracking-[0.2em] whitespace-nowrap">Volume Global</span>
+                            <div className="flex items-center gap-1.5">
+                               <TrendingUp size={10} className="text-emerald-500" />
+                               <span className="text-[12px] font-black text-slate-300 tabular-nums">{habit.totalExecutions} Atos</span>
                             </div>
                          </div>
+                         
+                         {/* COLUNA 2: RECORDE (AZUL NA ANOTAÇÃO) */}
                          <div className="flex flex-col gap-1">
-                            <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Recorde</span>
-                            <div className="flex items-center gap-2">
-                               <Trophy size={12} className="text-amber-500" />
-                               <span className="text-sm font-black text-slate-300 tabular-nums">{habit.maxStreak}d</span>
+                            <span className="text-[7px] font-black text-slate-600 uppercase tracking-[0.2em] whitespace-nowrap">Recorde Máx.</span>
+                            <div className="flex items-center gap-1.5">
+                               <Trophy size={10} className="text-amber-500" />
+                               <span className="text-[12px] font-black text-slate-300 tabular-nums">{habit.maxStreak} Dias</span>
                             </div>
                          </div>
+
+                         {/* COLUNA 3: TENDÊNCIA */}
                          <div className="flex flex-col gap-1">
-                            <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Tendência</span>
-                            <div className="flex items-center gap-1">
-                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                               <span className="text-[10px] font-black text-emerald-500 uppercase">Consistente</span>
+                            <span className="text-[7px] font-black text-slate-600 uppercase tracking-[0.2em] whitespace-nowrap">Tendência</span>
+                            <div className="flex items-center gap-1.5">
+                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_rgba(16,185,129,0.5)]" />
+                               <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">Consistente</span>
+                            </div>
+                         </div>
+
+                         {/* COLUNA 4: EFICIÊNCIA */}
+                         <div className="flex flex-col gap-1">
+                            <span className="text-[7px] font-black text-slate-600 uppercase tracking-[0.2em] whitespace-nowrap">Eficiência</span>
+                            <div className="flex items-center gap-1.5">
+                               <PieChart size={10} className="text-blue-500" />
+                               <span className="text-[12px] font-black text-slate-300 tabular-nums">92%</span>
                             </div>
                          </div>
                       </div>
 
-                      {/* 4. ADERÊNCIA */}
-                      <div className="text-right border-l border-slate-800 pl-8">
+                      {/* 4. ADERÊNCIA E AÇÕES */}
+                      <div className="flex items-center justify-between pl-4">
                         <div className="flex flex-col">
-                           <span className="text-2xl font-black text-white tabular-nums leading-none">
-                              {Math.round((habit.dailyProgress.filter((v, i) => v >= habit.targetValue && habit.recurrence[i]).length / habit.recurrence.filter(r => r).length) * 100)}%
+                           <span className="text-2xl font-black text-white tabular-nums leading-none tracking-tighter">
+                              {Math.round((habit.dailyProgress.filter((v, i) => v >= habit.targetValue && habit.recurrence[i]).length / Math.max(1, habit.recurrence.filter(r => r).length)) * 100)}%
                            </span>
                            <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mt-1">Aderência</p>
                         </div>
-                      </div>
 
-                      {/* 5. AÇÕES */}
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all pl-4">
-                        <button 
-                          onClick={() => setReportHabit(habit)} 
-                          className="p-2 text-slate-600 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-sm transition-all" 
-                          title="Relatório Analítico"
-                        >
-                          <BarChart3 size={16} />
-                        </button>
-                        <button 
-                          onClick={() => { setEditingHabit(habit); setNewHabitTitle(habit.title); setNewHabitTarget(habit.targetValue); setNewHabitStartDate(habit.startDate); setNewHabitRecurrence(habit.recurrence); setSelectedIcon(habit.iconName); setSelectedColor(habit.color); setIsHabitModalOpen(true); }} 
-                          className="p-2 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-sm transition-all" 
-                          title="Editar"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          onClick={() => setHabitToDelete(habit)} 
-                          className="p-2 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-sm transition-all" 
-                          title="Remover"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all ml-4">
+                          <button 
+                            onClick={() => setReportHabit(habit)} 
+                            className="p-1.5 text-slate-600 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-sm transition-all" 
+                            title="Relatório Analítico"
+                          >
+                            <BarChart3 size={14} />
+                          </button>
+                          <button 
+                            onClick={() => { setEditingHabit(habit); setNewHabitTitle(habit.title); setNewHabitTarget(habit.targetValue); setNewHabitStartDate(habit.startDate); setnewHabitRecurrence(habit.recurrence); setSelectedIcon(habit.iconName); setSelectedColor(habit.color); setIsHabitModalOpen(true); }} 
+                            className="p-1.5 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-sm transition-all" 
+                            title="Editar"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button 
+                            onClick={() => setHabitToDelete(habit)} 
+                            className="p-1.5 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-sm transition-all" 
+                            title="Remover"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
 
                     </div>
@@ -811,7 +811,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
           </div>
         )}
 
-        {/* ... (resto do código igual) */}
         {activeSubTab === 'CALENDARIO' && (
           <div className="flex-1 flex flex-col animate-in zoom-in-95 duration-500 overflow-hidden">
             <div className="flex items-center justify-between mb-6">
@@ -848,7 +847,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         {activeSubTab === 'COTIDIANO' && (
           <div className="flex flex-col h-full animate-in slide-in-from-left-4 duration-500 max-w-4xl mx-auto w-full">
             <div className="mb-6 flex justify-start">
-              <button onClick={() => { setEditingHabit(null); setNewHabitTitle(''); setNewHabitTarget(1); setNewHabitStartDate(''); setNewHabitRecurrence([true, true, true, true, true, true, true]); setSelectedIcon('Activity'); setSelectedColor('#3b82f6'); setIsHabitModalOpen(true); }} className="flex items-center gap-2 px-6 py-2.5 rounded-sm border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-400 hover:border-blue-500 hover:bg-blue-500/10 transition-all text-[10px] font-black uppercase tracking-[0.2em] group shadow-xl"><Plus size={14} className="group-hover:scale-125 transition-transform" />Registrar Novo Hábito</button>
+              <button onClick={() => { setEditingHabit(null); setNewHabitTitle(''); setNewHabitTarget(1); setNewHabitStartDate(''); setnewHabitRecurrence([true, true, true, true, true, true, true]); setSelectedIcon('Activity'); setSelectedColor('#3b82f6'); setIsHabitModalOpen(true); }} className="flex items-center gap-2 px-6 py-2.5 rounded-sm border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-400 hover:border-blue-500 hover:bg-blue-500/10 transition-all text-[10px] font-black uppercase tracking-[0.2em] group shadow-xl"><Plus size={14} className="group-hover:scale-125 transition-transform" />Registrar Novo Hábito</button>
             </div>
             <form onSubmit={addTask} className="mb-10 relative group w-full"><div className="absolute -inset-0.5 bg-blue-600 rounded-sm blur-sm opacity-0 group-focus-within:opacity-10 transition duration-500"></div><div className="relative flex gap-2"><input autoFocus className="flex-1 bg-slate-950 border border-slate-800 rounded-sm px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-700 shadow-sm" placeholder="Novo item operacional..." value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} /><button type="submit" disabled={!newTaskTitle.trim()} className="bg-blue-600 px-6 rounded-sm text-white hover:bg-blue-500 transition-all disabled:opacity-30 flex items-center justify-center shadow-md active:scale-95"><Plus size={20} strokeWidth={3} /></button></div></form>
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2 pb-10">
@@ -865,7 +864,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
         )}
       </div>
 
-      {/* NOVO: MODAL DE RELATÓRIO ANALÍTICO */}
+      {/* MODAL DE RELATÓRIO ANALÍTICO */}
       {reportHabit && (
         <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-300 px-4">
           <div className="bg-[#030712] border border-slate-800 rounded-sm w-full max-w-2xl shadow-2xl animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
@@ -883,7 +882,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
             </div>
 
             <div className="p-8 overflow-y-auto custom-scrollbar space-y-10">
-              {/* KPIs de Topo */}
               <div className="grid grid-cols-3 gap-6">
                 <div className="bg-slate-900/30 border border-slate-800 p-5 rounded-sm">
                    <div className="flex items-center gap-2 mb-2">
@@ -911,7 +909,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 </div>
               </div>
 
-              {/* Heatmap de Consistência (30 dias) */}
               <div className="space-y-4">
                  <div className="flex items-center justify-between">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Heatmap de Consistência (Últimos 30 Dias)</h4>
@@ -930,7 +927,6 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                  </div>
               </div>
 
-              {/* Tendência e Gráfico de Barras */}
               <div className="grid grid-cols-2 gap-8">
                  <div className="space-y-4">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Eficiência Semanal</h4>
