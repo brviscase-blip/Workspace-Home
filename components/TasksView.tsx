@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Plus, Trash2, CheckCircle, Circle, Terminal, ListCheck, Loader2, Target, 
   CalendarDays, CheckCircle2, LayoutGrid, ClipboardEdit, Edit2, Check, X, 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap, Activity, Flame,
   Settings2, AlertTriangle, Book, Dumbbell, Droplets, Brain, Timer, Heart, 
-  Smile, Coffee, Laptop, ShieldCheck, Stars
+  Smile, Coffee, Laptop, ShieldCheck, Stars, Calendar
 } from 'lucide-react';
 import { DailyTask } from '../types';
 import { supabase } from '../lib/supabase';
@@ -21,6 +21,7 @@ interface Habit {
   streak: number;
   iconName: string;
   color: string;
+  startDate: string;
 }
 
 // Mapa de ícones disponíveis para seleção
@@ -51,6 +52,90 @@ const HABIT_COLORS = [
   { name: 'Slate', value: '#64748b' },
 ];
 
+// --- COMPONENTE DATE PICKER CUSTOMIZADO ---
+interface CustomDatePickerProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+}
+
+const CustomDatePicker: React.FC<CustomDatePickerProps> = ({ label, value, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const fullMonths = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const formatDateLabel = (date: Date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month}, ${year}`;
+  };
+
+  const days = [];
+  const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+  const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
+
+  for (let i = 0; i < firstDay; i++) days.push(null);
+  for (let i = 1; i <= daysInMonth; i++) days.push(i);
+
+  const handleSelectDay = (day: number) => {
+    const selected = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+    onChange(formatDateLabel(selected));
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="space-y-1 relative" ref={containerRef}>
+      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">{label}</label>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full bg-slate-950 border rounded-sm px-4 py-3 text-sm flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'border-blue-500 ring-1 ring-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-slate-800 hover:border-slate-700'}`}
+      >
+        <span className={value ? 'text-white font-bold' : 'text-slate-700'}>{value || placeholder}</span>
+        <CalendarIcon size={16} className={value ? 'text-blue-500' : 'text-slate-600'} />
+      </div>
+      {isOpen && (
+        <div className="absolute z-[6000] left-0 mt-1 w-full min-w-[260px] bg-[#030712] border border-slate-800 rounded-sm shadow-2xl animate-in fade-in slide-in-from-top-1 duration-200 overflow-hidden">
+          <div className="flex items-center justify-between p-3 border-b border-slate-800 bg-black/40">
+            <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-sm transition-all"><ChevronLeft size={16} /></button>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] font-black text-white uppercase tracking-widest">{fullMonths[viewDate.getMonth()]}</span>
+              <span className="text-[9px] font-bold text-slate-500">{viewDate.getFullYear()}</span>
+            </div>
+            <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-sm transition-all"><ChevronRight size={16} /></button>
+          </div>
+          <div className="p-2">
+            <div className="grid grid-cols-7 mb-1">{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (<span key={i} className="text-center text-[8px] font-black text-slate-700 uppercase py-1">{d}</span>))}</div>
+            <div className="grid grid-cols-7 gap-1">
+              {days.map((day, i) => (
+                <div key={i} className="aspect-square flex items-center justify-center">
+                  {day !== null ? (
+                    <button type="button" onClick={() => handleSelectDay(day)} className={`w-full h-full rounded-sm text-[10px] font-bold transition-all flex items-center justify-center ${value.startsWith(day.toString().padStart(2, '0')) && value.includes(months[viewDate.getMonth()]) ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-500 hover:bg-slate-800 hover:text-white'}`}>{day}</button>
+                  ) : <div className="w-full h-full" />}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('HOJE');
   const [tasks, setTasks] = useState<DailyTask[]>([]);
@@ -61,6 +146,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [newHabitTitle, setNewHabitTitle] = useState('');
+  const [newHabitStartDate, setNewHabitStartDate] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Activity');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   
@@ -74,12 +160,12 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   // Estado para o Calendário
   const [viewDate, setViewDate] = useState(new Date());
 
-  // Mock de hábitos (Poderia ser expandido para Supabase futuramente)
+  // Mock de hábitos
   const [habits, setHabits] = useState<Habit[]>([
-    { id: 'h1', title: 'Leitura Técnica', days: [true, true, true, false, false, false, false], streak: 3, iconName: 'Book', color: '#3b82f6' },
-    { id: 'h2', title: 'Atividade Física', days: [true, false, true, false, true, false, false], streak: 1, iconName: 'Dumbbell', color: '#10b981' },
-    { id: 'h3', title: 'Meditação Protocolar', days: [true, true, true, true, true, true, false], streak: 6, iconName: 'Brain', color: '#8b5cf6' },
-    { id: 'h4', title: 'Beber Água', days: [false, false, false, false, false, false, false], streak: 0, iconName: 'Droplets', color: '#06b6d4' },
+    { id: 'h1', title: 'Leitura Técnica', days: [true, true, true, false, false, false, false], streak: 3, iconName: 'Book', color: '#3b82f6', startDate: '01 Jan, 2026' },
+    { id: 'h2', title: 'Atividade Física', days: [true, false, true, false, true, false, false], streak: 1, iconName: 'Dumbbell', color: '#10b981', startDate: '15 Jan, 2026' },
+    { id: 'h3', title: 'Meditação Protocolar', days: [true, true, true, true, true, true, false], streak: 6, iconName: 'Brain', color: '#8b5cf6', startDate: '05 Jan, 2026' },
+    { id: 'h4', title: 'Beber Água', days: [false, false, false, false, false, false, false], streak: 0, iconName: 'Droplets', color: '#06b6d4', startDate: '20 Jan, 2026' },
   ]);
 
   const fetchTodayTasks = async () => {
@@ -167,29 +253,29 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
   const handleSaveHabit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newHabitTitle.trim()) return;
+    if (!newHabitTitle.trim() || !newHabitStartDate) return;
 
     if (editingHabit) {
-      // Editar existente
       setHabits(prev => prev.map(h => 
         h.id === editingHabit.id 
-        ? { ...h, title: newHabitTitle.trim(), iconName: selectedIcon, color: selectedColor } 
+        ? { ...h, title: newHabitTitle.trim(), iconName: selectedIcon, color: selectedColor, startDate: newHabitStartDate } 
         : h
       ));
     } else {
-      // Criar novo
       const newHabit: Habit = {
         id: `h-${Date.now()}`,
         title: newHabitTitle.trim(),
         days: [false, false, false, false, false, false, false],
         streak: 0,
         iconName: selectedIcon,
-        color: selectedColor
+        color: selectedColor,
+        startDate: newHabitStartDate
       };
       setHabits(prev => [...prev, newHabit]);
     }
 
     setNewHabitTitle('');
+    setNewHabitStartDate('');
     setEditingHabit(null);
     setIsHabitModalOpen(false);
   };
@@ -252,14 +338,12 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
     }
   };
 
-  // Helper para renderizar ícone do hábito baseado no nome
   const HabitIcon = ({ name, color, size = 20 }: { name: string, color: string, size?: number }) => {
     const iconObj = HABIT_ICONS.find(i => i.name === name) || HABIT_ICONS[0];
     const IconComponent = iconObj.icon;
     return <IconComponent size={size} style={{ color }} />;
   };
 
-  // Lógica de Renderização do Calendário
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
     const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
@@ -271,14 +355,11 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
   }, [viewDate]);
 
   const monthName = viewDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-
   const totalToday = tasks.length;
   const completedToday = tasks.filter(t => t.completed).length;
   const progressPercent = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
   const goalReached = totalToday > 0 && progressPercent === 100;
-
   const todayFormatted = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' }).format(new Date());
-
   const weekDaysShort = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
   return (
@@ -375,7 +456,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
               </div>
             </div>
             <div className="lg:col-span-5 flex flex-col">
-              <div className="mb-4"><span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Performance Diária</span></div>
+              <div className="mb-4"><span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500">Performance Diária</span></div>
               <div className={`p-8 border transition-all duration-700 rounded-sm flex flex-col gap-6 w-full ${goalReached ? 'bg-emerald-500/5 border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.08)]' : 'bg-slate-900/20 border-slate-800 shadow-sm'}`}>
                 <div className="flex flex-col gap-6">
                   <div className="flex items-center justify-between">
@@ -415,6 +496,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 onClick={() => {
                   setEditingHabit(null);
                   setNewHabitTitle('');
+                  setNewHabitStartDate('');
                   setSelectedIcon('Activity');
                   setSelectedColor('#3b82f6');
                   setIsHabitModalOpen(true);
@@ -449,9 +531,15 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                         </div>
                         <div className="flex-1">
                           <h4 className="text-[13px] font-black text-white uppercase tracking-tight">{habit.title}</h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Flame size={10} className="text-orange-500" />
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias Seguidores</span>
+                          <div className="flex items-center gap-4 mt-1">
+                            <div className="flex items-center gap-2">
+                              <Flame size={10} className="text-orange-500" />
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{habit.streak} Dias</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3">
+                              <Calendar size={10} className="text-slate-600" />
+                              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">{habit.startDate}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -491,6 +579,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                             onClick={() => {
                               setEditingHabit(habit);
                               setNewHabitTitle(habit.title);
+                              setNewHabitStartDate(habit.startDate);
                               setSelectedIcon(habit.iconName);
                               setSelectedColor(habit.color);
                               setIsHabitModalOpen(true);
@@ -679,8 +768,8 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
       {/* MODAL DE CADASTRO/EDIÇÃO DE HÁBITO */}
       {isHabitModalOpen && (
-        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-[#030712] border border-slate-800 rounded-sm w-full max-w-lg shadow-2xl animate-in zoom-in duration-300 overflow-hidden">
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300 px-4">
+          <div className="bg-[#030712] border border-slate-800 rounded-sm w-full max-w-lg shadow-2xl animate-in zoom-in duration-300 overflow-visible">
             <div className="p-6 border-b border-slate-800 bg-black/20 flex items-center justify-between">
               <div className="flex flex-col gap-1">
                 <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
@@ -717,6 +806,14 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                    />
                 </div>
               </div>
+
+              {/* Data de Início Customizada */}
+              <CustomDatePicker 
+                label="Data do Início (Marco Zero)"
+                placeholder="Selecione a data de ativação..."
+                value={newHabitStartDate}
+                onChange={setNewHabitStartDate}
+              />
 
               {/* Seletor de Ícones */}
               <div className="space-y-3">
@@ -767,15 +864,20 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 </div>
               </div>
 
+              {/* Preview */}
               <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-sm flex items-start gap-4">
                  <div className="w-12 h-12 rounded-sm border flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${selectedColor}15`, borderColor: `${selectedColor}40` }}>
                     <HabitIcon name={selectedIcon} color={selectedColor} size={24} />
                  </div>
-                 <div>
-                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-1">Preview do Registro</span>
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                       {newHabitTitle || 'Defina um título...'}
+                 <div className="flex-1 min-w-0">
+                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-1">Resumo do Protocolo</span>
+                    <p className="text-[11px] text-slate-200 font-bold uppercase truncate">
+                       {newHabitTitle || 'Aguardando título...'}
                     </p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                       <Calendar size={10} className="text-slate-600" />
+                       <span className="text-[9px] font-black text-slate-500 uppercase">{newHabitStartDate || 'Data não definida'}</span>
+                    </div>
                  </div>
               </div>
 
@@ -792,7 +894,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 </button>
                 <button 
                   type="submit"
-                  disabled={!newHabitTitle.trim()}
+                  disabled={!newHabitTitle.trim() || !newHabitStartDate}
                   className="flex-1 px-4 py-3 bg-blue-600 rounded-sm text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-30"
                 >
                   {editingHabit ? 'Salvar Alterações' : 'Ativar Hábito'}
@@ -805,7 +907,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
 
       {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
       {habitToDelete && (
-        <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/85 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setHabitToDelete(null)}>
+        <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/85 backdrop-blur-sm animate-in fade-in duration-200 px-4" onClick={() => setHabitToDelete(null)}>
           <div 
             className="bg-[#030712] border border-rose-500/30 rounded-sm w-full max-w-sm p-8 shadow-2xl shadow-rose-500/10 animate-in zoom-in duration-200"
             onClick={(e) => e.stopPropagation()}
@@ -815,7 +917,7 @@ const TasksView: React.FC<TasksViewProps> = ({ currentUser }) => {
                 <AlertTriangle size={32} className="text-rose-500 animate-pulse" />
               </div>
               <h3 className="text-[12px] font-black uppercase tracking-[0.3em] text-white mb-2">Protocolo de Exclusão</h3>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-8">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-8 leading-relaxed">
                 Confirmar remoção permanente do hábito <span className="text-rose-400">"{habitToDelete.title}"</span>? Esta ação não pode ser revertida.
               </p>
               
